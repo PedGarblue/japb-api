@@ -21,3 +21,11 @@ Run a command inside the docker container:
 ```bash
 docker-compose run --rm web [command]
 ```
+
+Create admin user on container
+
+```bash
+docker exec -it django_test_web_1 bash
+
+python3 manage.py createsuperuser
+```
