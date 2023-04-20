@@ -5,6 +5,6 @@ omit = *migrations*,
        *test*,
        *admin*,
        ./manage.py,
-       ./japb-api/config/*,
-       ./japb-api/wsgi.py,
+       ./japb_api/config/*,
+       ./japb_api/wsgi.py,
        *__init__*

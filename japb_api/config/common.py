@@ -23,8 +23,7 @@ class Common(Configuration):
         'django_filters',            # for filtering rest endpoints
 
         # Your apps
-        'japb-api.users',
-
+        'japb_api.users',
     )
 
     # https://docs.djangoproject.com/en/2.0/topics/http/middleware/
@@ -39,9 +38,9 @@ class Common(Configuration):
     )
 
     ALLOWED_HOSTS = ["*"]
-    ROOT_URLCONF = 'japb-api.urls'
+    ROOT_URLCONF = 'japb_api.urls'
     SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
-    WSGI_APPLICATION = 'japb-api.wsgi.application'
+    WSGI_APPLICATION = 'japb_api.wsgi.application'
 
     # Email
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'

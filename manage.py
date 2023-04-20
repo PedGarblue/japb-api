@@ -5,7 +5,7 @@ import sys
 
 
 def main():
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "japb-api.config")
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "japb_api.config")
     os.environ.setdefault("DJANGO_CONFIGURATION", "Local")
 
     try:

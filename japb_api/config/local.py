@@ -16,7 +16,7 @@ class Local(Common):
         '--nologcapture',
         '--with-coverage',
         '--with-progressive',
-        '--cover-package=japb-api'
+        '--cover-package=japb_api'
     ]
 
     # Mail
