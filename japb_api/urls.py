@@ -7,11 +7,13 @@ from rest_framework.routers import DefaultRouter
 from rest_framework.authtoken import views
 from .users.views import UserViewSet, UserCreateViewSet
 from .currencies.views import CurrencyViewSet
+from .accounts.views import AccountViewSet
 
 router = DefaultRouter()
 router.register(r'users', UserViewSet)
 router.register(r'users', UserCreateViewSet)
 router.register(r'currencies', CurrencyViewSet, basename='currencies')
+router.register(r'accounts', AccountViewSet, basename='accounts')
 
 
 urlpatterns = [
