@@ -11,6 +11,7 @@ class TestCurrencyViews(APITestCase):
         self.fake = Faker(['en-US'])
         self.data = {
             'name': 'USD',
+            'symbol': '$',
         }
         self.response = self.client.post(
             reverse('currencies-list'),
@@ -22,6 +23,7 @@ class TestCurrencyViews(APITestCase):
         eq_(self.response.status_code, status.HTTP_201_CREATED)
         eq_(Currency.objects.count(), 1)
         self.assertEqual(Currency.objects.get().name, 'USD')
+        self.assertEqual(Currency.objects.get().symbol, '$')
 
     def test_api_get_currency_list(self):
         url = reverse('currencies-list')
@@ -30,6 +32,7 @@ class TestCurrencyViews(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(Currency.objects.count(), 1)
         self.assertEqual(response.json()[0]['name'], 'USD')
+        self.assertEqual(response.json()[0]['symbol'], '$')
 
     def test_api_get_a_currency(self):
         currency = Currency.objects.get()
@@ -38,6 +41,7 @@ class TestCurrencyViews(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json()['name'], 'USD')
+        self.assertEqual(response.json()['symbol'], '$')
         self.assertEqual(Currency.objects.count(), 1)
 
 
@@ -45,10 +49,12 @@ class TestCurrencyViews(APITestCase):
         currency = Currency.objects.get()
         new_data = {
             "name": "Super USD",
+            "symbol": "$$",
         }
         response = self.client.put(reverse('currencies-detail', kwargs={ 'pk': currency.id }), data=new_data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(Currency.objects.get().name, "Super USD")
+        self.assertEqual(Currency.objects.get().symbol, "$$")
 
     def test_api_can_delete_a_currency(self):
         currency = Currency.objects.get()
