@@ -26,6 +26,7 @@ class Common(Configuration):
         'japb_api.users',
         'japb_api.currencies',
         'japb_api.accounts',
+        'japb_api.transactions',
     )
 
     # https://docs.djangoproject.com/en/2.0/topics/http/middleware/

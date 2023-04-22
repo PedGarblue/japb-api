@@ -8,13 +8,15 @@ from rest_framework.authtoken import views
 from .users.views import UserViewSet, UserCreateViewSet
 from .currencies.views import CurrencyViewSet
 from .accounts.views import AccountViewSet
+from .transactions.views import TransactionViewSet, CurrencyExchangeViewSet
 
 router = DefaultRouter()
 router.register(r'users', UserViewSet)
 router.register(r'users', UserCreateViewSet)
 router.register(r'currencies', CurrencyViewSet, basename='currencies')
 router.register(r'accounts', AccountViewSet, basename='accounts')
-
+router.register(r'transactions', TransactionViewSet, basename='transactions')
+router.register(r'exchanges', CurrencyExchangeViewSet, basename='exchanges')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
