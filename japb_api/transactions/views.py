@@ -20,17 +20,21 @@ class TransactionViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     def create(self, request):
-        transaction_data = {
-            'amount': request.data['amount'],
-            'description': request.data['description'],
-            'account': request.data['account'],
-            'date': request.data['date'],
-        }
-        transaction_serializer = self.get_serializer(data = transaction_data)
-        if (transaction_serializer.is_valid()):
-            transaction = transaction_serializer.save()
-            return Response(transaction_serializer.data, status = status.HTTP_201_CREATED) 
-        return Response(status = status.HTTP_400_BAD_REQUEST)
+        transactions_data = request.data
+        if not isinstance(transactions_data, list):
+            transactions_data = [transactions_data]
+
+        created_transactions = []
+        for transaction_data in transactions_data:
+            transaction_serializer = self.get_serializer(data=transaction_data)
+            if transaction_serializer.is_valid():
+                transaction = transaction_serializer.save()
+                created_transactions.append(transaction_serializer.data)
+            else:
+                return Response(transaction_serializer.errors,
+                                status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(created_transactions, status=status.HTTP_201_CREATED)
 
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)

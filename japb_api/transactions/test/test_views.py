@@ -3,11 +3,11 @@ from faker import Faker
 from datetime import datetime, timezone
 from django.urls import reverse
 from rest_framework import status
-from rest_framework.test import APITestCase, APIRequestFactory
+from rest_framework.test import APITestCase
 
 from ..models import Transaction, CurrencyExchange
+from .factories import TransactionFactory
 from japb_api.accounts.models import Account
-from japb_api.accounts.serializers import AccountSerializer
 from japb_api.accounts.models import Currency
 
 class TestCurrencyTransaction(APITestCase):
@@ -21,6 +21,19 @@ class TestCurrencyTransaction(APITestCase):
             'account': self.account.id,
             'date': datetime.now(tz=timezone.utc),
         }
+        self.data2 = {
+            'amount': -30,
+            'description': 'Purchase2',
+            'account': self.account.id,
+            'date': datetime.now(tz=timezone.utc),
+        }
+        self.data3 = {
+            'amount': -500,
+            'description': 'Purchase3',
+            'account': self.account.id,
+            'date': datetime.now(tz=timezone.utc),
+        }
+
         self.response = self.client.post(
             reverse('transactions-list'),
             self.data,
@@ -33,6 +46,18 @@ class TestCurrencyTransaction(APITestCase):
         self.assertEqual(Transaction.objects.count(), 1)
         self.assertEqual(transaction.description, 'Purchase')
         self.assertEqual(transaction.amount, -50)
+
+    def test_api_create_multiple_transactions(self):
+        data = [self.data, self.data2, self.data3]
+        response = self.client.post(
+            reverse('transactions-list'),
+            data,
+            format = 'json'
+        )
+
+        self.assertEqual(self.response.status_code, status.HTTP_201_CREATED)
+        # 3 + the one created at setUp()
+        self.assertEqual(Transaction.objects.count(), 4)
 
     def test_api_get_transactions(self):
         url = reverse('transactions-list')
