@@ -1,13 +1,15 @@
+import pytz
 from faker import Faker
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from japb_api.currencies.models import Currency
+from japb_api.transactions.models import Transaction
 from ..models import Account
 
 # /accounts/ endpoints
-class TestViews(APITestCase):
+class TestAccountsViews(APITestCase):
     def setUp(self):
         self.fake = Faker(['en-US'])
         self.currency = Currency.objects.create(name = 'USD')
@@ -62,3 +64,17 @@ class TestViews(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(Account.objects.count(), 0)
 
+    def test_api_get_balances(self):
+        account = Account.objects.get()
+        transactions = [
+            Transaction(amount=10.64, description="transaction 1", account=account, date=self.fake.date_time(tzinfo=pytz.UTC)),
+            Transaction(amount=30.46, description="transaction 2", account=account, date=self.fake.date_time(tzinfo=pytz.UTC)),
+            Transaction(amount=-41, description="transaction 3", account=account, date=self.fake.date_time(tzinfo=pytz.UTC))
+        ]
+        Transaction.objects.bulk_create(transactions) 
+
+        url = reverse('balances-list')
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['Test Account'], '0.10')
