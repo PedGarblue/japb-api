@@ -17,10 +17,21 @@ class ReceivableViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     def create(self, request):
-        serializer = self.get_serializer(data=request.data)
-        if(serializer.is_valid(raise_exception = True)):
-            serializer.save()
-            return Response(serializer.data, status.HTTP_201_CREATED)
+        receivables_data = request.data
+        if not isinstance(receivables_data, list):
+            receivables_data = [receivables_data]
+
+        created_receivables = []
+        for receivable_data in receivables_data:
+            receivable_serializer = self.get_serializer(data=receivable_data)
+            if receivable_serializer.is_valid():
+                receivable = receivable_serializer.save()
+                created_receivables.append(receivable_serializer.data)
+            else:
+                return Response(receivable_serializer.errors,
+                                status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(created_receivables, status=status.HTTP_201_CREATED)
 
     def retrieve(self, request, pk=None):
         try:

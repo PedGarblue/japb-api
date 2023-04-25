@@ -23,6 +23,24 @@ class TestReceivableViews(APITestCase):
             'contact': 'contact-1',
             'status': 'UNPAID',
         }
+        self.data2 = {
+            'description': 'Test Receivable2',
+            'amount_given': 100,
+            'amount_to_receive': 130,
+            'due_date': date(2022, 2, 1),
+            'account': self.account.id,
+            'contact': 'contact-1',
+            'status': 'UNPAID',
+        }
+        self.data3 = {
+            'description': 'Test Receivable2',
+            'amount_given': 30,
+            'amount_to_receive': 34,
+            'due_date': date(2022, 2, 1),
+            'account': self.account.id,
+            'contact': 'contact-2',
+            'status': 'UNPAID',
+        }
         self.response = self.client.post(reverse('receivables-list'), self.data, format='json')
 
     def test_api_create_receivable(self):
@@ -33,6 +51,17 @@ class TestReceivableViews(APITestCase):
         self.assertEqual(float(Receivable.objects.get().amount_to_receive), 13.00)
         self.assertEqual(float(Receivable.objects.get().amount_paid), 0.00)
         self.assertEqual(Receivable.objects.get().status, 'UNPAID')
+
+    def test_api_create_multiple_transactions(self):
+        data = [self.data, self.data2, self.data3]
+        response = self.client.post(
+            reverse('receivables-list'),
+            data,
+            format = 'json'
+        )
+        self.assertEqual(self.response.status_code, status.HTTP_201_CREATED)
+        # 3 + the one created at setUp()
+        self.assertEqual(Receivable.objects.count(), 4)
 
     def test_api_get_receivables(self):
         receivable = Receivable.objects.get()
