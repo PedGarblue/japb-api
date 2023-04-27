@@ -64,7 +64,7 @@ class TestAccountsViews(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(Account.objects.count(), 0)
 
-    def test_api_get_balances(self):
+    def test_api_accounts_list_show_balances(self):
         account = Account.objects.get()
         transactions = [
             Transaction(amount=10.64, description="transaction 1", account=account, date=self.fake.date_time(tzinfo=pytz.UTC)),
@@ -73,8 +73,22 @@ class TestAccountsViews(APITestCase):
         ]
         Transaction.objects.bulk_create(transactions) 
 
-        url = reverse('balances-list')
+        url = reverse('accounts-list')
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.json()['Test Account'], '0.10')
+        self.assertEqual(response.json()[0]['balance'], '0.10')
+
+    def test_api_account_detail_shows_balance(self):
+        account = Account.objects.get()
+        transactions = [
+            Transaction(amount=20.10, description="transaction 1", account=account, date=self.fake.date_time(tzinfo=pytz.UTC)),
+            Transaction(amount=30.50, description="transaction 2", account=account, date=self.fake.date_time(tzinfo=pytz.UTC)),
+            Transaction(amount=-50.50, description="transaction 3", account=account, date=self.fake.date_time(tzinfo=pytz.UTC))
+        ]
+        Transaction.objects.bulk_create(transactions) 
+
+        response = self.client.get(reverse('accounts-detail', kwargs={ 'pk': account.id }), format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['balance'], '0.10')

@@ -54,15 +54,3 @@ class AccountViewSet(viewsets.ModelViewSet):
 
         account.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-class AccountsBalanceViewSet(viewsets.ViewSet):
-    permission_classes = (AllowAny,)
-    def list(self, request):
-        balances = {}
-        accounts = Account.objects.values('id', 'name')
-        for account in accounts:
-            queryset = Transaction.objects.filter(account = account['id'])
-            total = queryset.aggregate(balance=Sum('amount', default = 0))['balance']
-            # classic problem of floating points in python :^)
-            balances[account['name']] = "%.2f" % total
-        return Response(balances, status=status.HTTP_200_OK)
