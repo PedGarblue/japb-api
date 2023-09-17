@@ -157,6 +157,30 @@ class TestCurrencyTransaction(APITestCase):
         # created with the correct dates
         self.assertEqual(response_from.date, data_payload['date'])
         self.assertEqual(response_to.date, data_payload['date'])
+
+    def test_api_create_transaction_with_default_description(self):
+        # the default description should be "Exchange from {from_account_name} to {to_account_name}"
+        to_currency = Currency.objects.create(name = 'VES', symbol="bs")
+        from_account = self.account
+        to_account = Account.objects.create(name = 'Mercantil', currency = to_currency)
+        data_payload = {
+            'from_amount': '50.5',
+            'to_amount': 1250,
+            'from_account': from_account.id,
+            'to_account': to_account.id,
+            'date': datetime.now(tz=timezone.utc),
+        }
+        response = self.client.post(
+            reverse('exchanges-list'),
+            data_payload,
+            format = 'json'
+        )
+        transaction_response = response.json()
+        response_from = CurrencyExchange.objects.get(pk=transaction_response[0]['id'])
+        response_to = CurrencyExchange.objects.get(pk=transaction_response[1]['id'])
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response_from.description, f"Exchange from {from_account.name} to {to_account.name}")
         
     # should delete the 2 transactions created
     def test_api_delete_currency_exchange(self):

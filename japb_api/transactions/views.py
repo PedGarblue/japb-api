@@ -3,6 +3,7 @@ from rest_framework.decorators import api_view, action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from django_filters.rest_framework import DjangoFilterBackend
+from ..accounts.models import Account
 from .models import Transaction, CurrencyExchange
 from .serializers import TransactionSerializer, CurrencyExchangeSerializer, TransactionFilterSet
     
@@ -63,24 +64,36 @@ class CurrencyExchangeViewSet(viewsets.ModelViewSet):
     permission_classes = (AllowAny,)
 
     def create(self, request):
+        try:
+            account_from = Account.objects.get(pk = request.data['from_account'])
+            account_to = Account.objects.get(pk = request.data['to_account']) 
+        except Account.DoesNotExist:
+            return Response({ 'errors': { 'accounts': 'Invalid Accounts' } }, status = status.HTTP_400_BAD_REQUEST) 
+
+        description = request.data.get('description', f'Exchange from {account_from.name} to {account_to.name}')
         from_account_transaction_data = {
             'amount': -float(request.data['from_amount']),
-            'description': request.data['description'],
             'account': request.data['from_account'],
+            'description': description,
             'date': request.data['date'],
         }
         to_account_transaction_data = {
             'amount': float(request.data['to_amount']),
-            'description': request.data['description'],
             'account': request.data['to_account'],
+            'description': description,
             'date': request.data['date'],
         }
-        serializer_from = self.get_serializer(data = from_account_transaction_data)
-        serializer_to = self.get_serializer(data = to_account_transaction_data)
+        transaction_from_serializer = self.get_serializer(data = from_account_transaction_data)
+        transaction_to_serializer = self.get_serializer(data = to_account_transaction_data)
 
-        if (serializer_from.is_valid() and serializer_to.is_valid()):
-            from_account_transaction = serializer_from.save()
-            to_account_transaction =  serializer_to.save()
+        if transaction_from_serializer.is_valid() and transaction_to_serializer.is_valid():
+            # Set descripttion to "Exchange from <from_account> to <to_account>" if no description is provided
+            account_to_name = transaction_to_serializer.validated_data['account'].name
+            account_from_name = transaction_from_serializer.validated_data['account'].name
+
+            # Save the transactions first so we can set the related_transaction field
+            from_account_transaction = transaction_from_serializer.save()
+            to_account_transaction = transaction_to_serializer.save()
 
             # Set the related_transaction field of the to_account_transaction
             to_account_transaction.related_transaction = from_account_transaction
@@ -89,6 +102,5 @@ class CurrencyExchangeViewSet(viewsets.ModelViewSet):
             # Set the related_transaction field of the from_account_transaction
             from_account_transaction.related_transaction = to_account_transaction
             from_account_transaction.save()
-
-            return Response([serializer_from.data, serializer_to.data], status = status.HTTP_201_CREATED) 
-        return Response(status = status.HTTP_400_BAD_REQUEST)
+            return Response([transaction_from_serializer.data, transaction_to_serializer.data], status = status.HTTP_201_CREATED) 
+        return Response([transaction_from_serializer.errors, transaction_to_serializer.errors], status = status.HTTP_400_BAD_REQUEST) 
