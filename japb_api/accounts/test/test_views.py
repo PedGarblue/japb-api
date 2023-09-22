@@ -15,18 +15,37 @@ class TestAccountsViews(APITestCase):
         self.currency = Currency.objects.create(name = 'USD')
         self.data = {
             'name': 'Test Account',
-            'currency': self.currency.id
+            'currency': self.currency.id,
+            'decimal_places': '2'
         }
         self.response = self.client.post(
             reverse('accounts-list'),
             self.data,
             format = 'json'
         )
-
+    
     def test_api_create_account(self):
         self.assertEqual(self.response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Account.objects.count(), 1)
         self.assertEqual(Account.objects.get().name, 'Test Account')
+
+    def test_api_create_account_without_optional_params(self):
+        # clean up
+        Account.objects.all().delete()
+
+        data = {
+            'name': 'Test Account',
+            'currency': self.currency.id,
+        }
+        response = self.client.post(
+            reverse('accounts-list'),
+            data,
+            format = 'json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Account.objects.count(), 1)
+        self.assertEqual(Account.objects.get().decimal_places, 2)
 
     def test_api_get_accounts(self):
         account = Account.objects.get()

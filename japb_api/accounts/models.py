@@ -4,6 +4,7 @@ from ..currencies.models import Currency
 class Account(models.Model):
     name = models.CharField(max_length=100)
     currency = models.ForeignKey(Currency, on_delete=models.PROTECT)
+    decimal_places = models.IntegerField(default=2)
     created_at= models.DateTimeField(auto_now_add=True)
     updated_at= models.DateTimeField(auto_now=True)
 
