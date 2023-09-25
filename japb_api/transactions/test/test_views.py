@@ -41,11 +41,33 @@ class TestCurrencyTransaction(APITestCase):
         )
 
     def test_api_create_transaction(self):
-        transaction = Transaction.objects.get()
         self.assertEqual(self.response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Transaction.objects.count(), 1)
+        transaction = Transaction.objects.get()
         self.assertEqual(transaction.description, 'Purchase')
-        self.assertEqual(transaction.amount, -50)
+        self.assertEqual(transaction.amount, -5000)
+
+    def test_api_create_transaction_handles_decimal_places(self):
+        Transaction.objects.all().delete()
+        # create an account with 3 decimal places
+        account = Account.objects.create(name = 'Binance BTC', currency = self.currency, decimal_places = 8)
+        data = {
+            'amount': 0.00040000,
+            'description': 'Purchase',
+            'account': account.id,
+            'date': datetime.now(tz=timezone.utc),
+        }
+        response = self.client.post(
+            reverse('transactions-list'),
+            data,
+            format = 'json'
+        )
+        transaction = Transaction.objects.get()
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Transaction.objects.count(), 1)
+        # the amount should be saved as integer when the account decimal place are greater than 2
+        # in the account serializer, the amount is divided by 10 ** account.decimal_places
+        self.assertEqual(transaction.amount, 40000)
 
     def test_api_create_multiple_transactions(self):
         data = [self.data, self.data2, self.data3]
@@ -56,20 +78,24 @@ class TestCurrencyTransaction(APITestCase):
         )
 
         self.assertEqual(self.response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(self.response.json()[0]['amount'], '-50.00')
         # 3 + the one created at setUp()
         self.assertEqual(Transaction.objects.count(), 4)
-
+    
     def test_api_get_transactions(self):
         url = reverse('transactions-list')
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(Transaction.objects.count(), 1)
+        # amount
+        self.assertEqual(response.json()[0]['amount'], '-50.00')
 
     def test_api_get_a_transaction(self):
         transaction = Transaction.objects.get()
         response = self.client.get(reverse('transactions-detail', kwargs={ 'pk': transaction.id }), format='json')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['amount'], '-50.00')
         self.assertEqual(Transaction.objects.count(), 1)
 
     def test_api_get_a_transaction_not_found(self):
@@ -90,7 +116,7 @@ class TestCurrencyTransaction(APITestCase):
         updated_transaction = Transaction.objects.get()
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(updated_transaction.description, "New transaction")
-        self.assertEqual(updated_transaction.amount, -5)
+        self.assertEqual(updated_transaction.amount, -500)
 
     def test_api_can_delete_a_transaction(self):
         transaction = Transaction.objects.get()
@@ -127,7 +153,7 @@ class TestCurrencyTransaction(APITestCase):
         from_account = self.account
         to_account = Account.objects.create(name = 'Mercantil', currency = to_currency)
         data_payload = {
-            'from_amount': '50.5',
+            'from_amount': '50.50',
             'to_amount': 1250,
             'description': 'Exchange USD to VES',
             'from_account': from_account.id,
@@ -146,8 +172,8 @@ class TestCurrencyTransaction(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(CurrencyExchange.objects.count(), 2)
         # created with the correct amounts
-        self.assertEqual(response_from.amount, -50.5)
-        self.assertEqual(response_to.amount, 1250)
+        self.assertEqual(response_from.amount, -5050)
+        self.assertEqual(response_to.amount, 125000)
         # created with the correct accounts
         self.assertEqual(response_from.account, from_account)
         self.assertEqual(response_to.account, to_account)

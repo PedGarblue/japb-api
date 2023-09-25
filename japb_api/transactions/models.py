@@ -1,7 +1,7 @@
 from django.db import models
 from ..accounts.models import Account
 class Transaction(models.Model):
-    amount = models.DecimalField(max_digits=19, decimal_places = 2)
+    amount = models.IntegerField()
     description = models.CharField(max_length=500)
     account = models.ForeignKey(Account, on_delete=models.PROTECT)
     date = models.DateTimeField()

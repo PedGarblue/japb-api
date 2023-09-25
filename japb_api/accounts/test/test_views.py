@@ -86,9 +86,9 @@ class TestAccountsViews(APITestCase):
     def test_api_accounts_list_show_balances(self):
         account = Account.objects.get()
         transactions = [
-            Transaction(amount=10.64, description="transaction 1", account=account, date=self.fake.date_time(tzinfo=pytz.UTC)),
-            Transaction(amount=30.46, description="transaction 2", account=account, date=self.fake.date_time(tzinfo=pytz.UTC)),
-            Transaction(amount=-41, description="transaction 3", account=account, date=self.fake.date_time(tzinfo=pytz.UTC))
+            Transaction(amount=1064, description="transaction 1", account=account, date=self.fake.date_time(tzinfo=pytz.UTC)),
+            Transaction(amount=3046, description="transaction 2", account=account, date=self.fake.date_time(tzinfo=pytz.UTC)),
+            Transaction(amount=-4100, description="transaction 3", account=account, date=self.fake.date_time(tzinfo=pytz.UTC))
         ]
         Transaction.objects.bulk_create(transactions) 
 
@@ -101,9 +101,9 @@ class TestAccountsViews(APITestCase):
     def test_api_account_detail_shows_balance(self):
         account = Account.objects.get()
         transactions = [
-            Transaction(amount=20.10, description="transaction 1", account=account, date=self.fake.date_time(tzinfo=pytz.UTC)),
-            Transaction(amount=30.50, description="transaction 2", account=account, date=self.fake.date_time(tzinfo=pytz.UTC)),
-            Transaction(amount=-50.50, description="transaction 3", account=account, date=self.fake.date_time(tzinfo=pytz.UTC))
+            Transaction(amount=2010, description="transaction 1", account=account, date=self.fake.date_time(tzinfo=pytz.UTC)),
+            Transaction(amount=3050, description="transaction 2", account=account, date=self.fake.date_time(tzinfo=pytz.UTC)),
+            Transaction(amount=-5050, description="transaction 3", account=account, date=self.fake.date_time(tzinfo=pytz.UTC))
         ]
         Transaction.objects.bulk_create(transactions) 
 
@@ -111,3 +111,22 @@ class TestAccountsViews(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json()['balance'], '0.10')
+
+    def test_api_account_parses_decimals_correctly(self):
+        account = Account.objects.get()
+        account.decimal_places = 8
+        account.save()
+
+        # imagine btc transactions
+        transactions = [
+            # 10000 satoshis = 0.00010000 btc
+            Transaction(amount=10000, description="transaction 1", account=account, date=self.fake.date_time(tzinfo=pytz.UTC)),
+            Transaction(amount=30050, description="transaction 2", account=account, date=self.fake.date_time(tzinfo=pytz.UTC)),
+            Transaction(amount=-15050, description="transaction 3", account=account, date=self.fake.date_time(tzinfo=pytz.UTC))
+        ]
+        Transaction.objects.bulk_create(transactions) 
+
+        response = self.client.get(reverse('accounts-detail', kwargs={ 'pk': account.id }), format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['balance'], '0.00025000')

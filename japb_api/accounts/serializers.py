@@ -10,7 +10,7 @@ class AccountSerializer(serializers.ModelSerializer):
     balance = serializers.SerializerMethodField()
     class Meta:
         model = Account
-        fields = ['id', 'name', 'currency', 'balance']
+        fields = ['id', 'name', 'currency', 'balance', 'decimal_places']
         read_only_field = ['id', 'created_at', 'balance'],
 
     # The get_balance method calculates the balance of the account using all currency transactions associated with it.
@@ -18,6 +18,10 @@ class AccountSerializer(serializers.ModelSerializer):
     # using the aggregate method, and returns the balance.
     def get_balance(self, account):
         queryset = Transaction.objects.filter(account = account.id)
-        total = queryset.aggregate(total=Sum('amount', default = 0))['total']
-        # classic problem of floating points in python :^)
-        return "%.2f" % total
+        amount_sum = queryset.aggregate(total=Sum('amount', default = 0))['total']
+        # the amounts of the accounts where decimal_places is not 2 are divided by decimal_places * 10
+        # if the account uses 2 decimal places, return total
+        total = amount_sum / (10 ** account.decimal_places)
+
+        # Return as string with the number of decimal places specified in the account
+        return f'{total:.{account.decimal_places}f}'

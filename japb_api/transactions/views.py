@@ -7,6 +7,9 @@ from ..accounts.models import Account
 from .models import Transaction, CurrencyExchange
 from .serializers import TransactionSerializer, CurrencyExchangeSerializer, TransactionFilterSet
     
+def parse_amount(amount, decimal_places):
+    return int(amount * (10 ** decimal_places))
+
 class TransactionViewSet(viewsets.ModelViewSet):
     queryset = Transaction.objects.all()
     serializer_class = TransactionSerializer
@@ -27,7 +30,13 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
         created_transactions = []
         for transaction_data in transactions_data:
+
             transaction_serializer = self.get_serializer(data=transaction_data)
+
+            amount = float(transaction_serializer.initial_data.get('amount'))
+            decimal_places = Account.objects.get(pk=transaction_serializer.initial_data.get('account')).decimal_places
+            transaction_serializer.initial_data['amount'] = parse_amount(amount, decimal_places)
+
             if transaction_serializer.is_valid():
                 transaction = transaction_serializer.save()
                 created_transactions.append(transaction_serializer.data)
@@ -47,6 +56,11 @@ class TransactionViewSet(viewsets.ModelViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         serializer = TransactionSerializer(transaction, data=request.data)
+
+        amount = float(serializer.initial_data.get('amount'))
+        decimal_places = Account.objects.get(pk=serializer.initial_data.get('account')).decimal_places
+        serializer.initial_data['amount'] = parse_amount(amount, decimal_places)
+
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
@@ -71,6 +85,15 @@ class CurrencyExchangeViewSet(viewsets.ModelViewSet):
             return Response({ 'errors': { 'accounts': 'Invalid Accounts' } }, status = status.HTTP_400_BAD_REQUEST) 
 
         description = request.data.get('description', f'Exchange from {account_from.name} to {account_to.name}')
+
+        from_amount = float(request.data.get('from_amount'))
+        from_decimal_places = account_from.decimal_places
+        request.data['from_amount'] = parse_amount(from_amount, from_decimal_places)
+
+        to_amount = float(request.data.get('to_amount'))
+        to_decimal_places = account_to.decimal_places
+        request.data['to_amount'] = parse_amount(to_amount, to_decimal_places)
+
         from_account_transaction_data = {
             'amount': -float(request.data['from_amount']),
             'account': request.data['from_account'],
@@ -87,10 +110,6 @@ class CurrencyExchangeViewSet(viewsets.ModelViewSet):
         transaction_to_serializer = self.get_serializer(data = to_account_transaction_data)
 
         if transaction_from_serializer.is_valid() and transaction_to_serializer.is_valid():
-            # Set descripttion to "Exchange from <from_account> to <to_account>" if no description is provided
-            account_to_name = transaction_to_serializer.validated_data['account'].name
-            account_from_name = transaction_from_serializer.validated_data['account'].name
-
             # Save the transactions first so we can set the related_transaction field
             from_account_transaction = transaction_from_serializer.save()
             to_account_transaction = transaction_to_serializer.save()
