@@ -107,6 +107,27 @@ class TestReportViews(APITestCase):
         self.assertEqual(json_data[0]['total_income'], 4110)
         self.assertEqual(json_data[0]['total_expenses'], -4100)
 
+    def test_api_lists_reports_by_account(self):
+        account2 = Account.objects.create(name='Test Account 2', currency=self.currency)
+        Report.objects.create(
+            from_date=date(2023, 1, 1),
+            to_date=date(2023, 1, 31),
+            account=account2,
+        )
+        Transaction.objects.bulk_create(self.transactions) 
+        self.client.post(reverse('reports-list'), self.data, format='json')
+        response = self.client.get(reverse('reports-list'), { 'account': self.account.id }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        json_data = response.json() 
+        self.assertEqual(len(json_data), 1)
+        self.assertEqual(json_data[0]['from_date'], '2023-01-01')
+        self.assertEqual(json_data[0]['to_date'], '2023-01-31')
+        self.assertEqual(json_data[0]['initial_balance'], 6000)
+        self.assertEqual(json_data[0]['end_balance'], 6010)
+        self.assertEqual(json_data[0]['total_income'], 4110)
+        self.assertEqual(json_data[0]['total_expenses'], -4100)
+
     def test_api_get_report(self):
         Transaction.objects.bulk_create(self.transactions) 
         self.client.post(reverse('reports-list'), self.data, format='json')

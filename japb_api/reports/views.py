@@ -1,6 +1,7 @@
 from django.http import JsonResponse
 from .models import Report
-from .serializers import ReportSerializer
+from .serializers import ReportSerializer, ReportFilterSet
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
@@ -9,7 +10,9 @@ from rest_framework import status, viewsets
 class ReportViewSet(viewsets.ModelViewSet):
     queryset = Report.objects.all()
     serializer_class = ReportSerializer
+    filter_backends = (DjangoFilterBackend,)
     permission_classes = (AllowAny,)
+    filterset_class = ReportFilterSet
 
     def create(self, request):
         reports_data = request.data
@@ -37,7 +40,7 @@ class ReportViewSet(viewsets.ModelViewSet):
         return Response(created_reports, status=status.HTTP_201_CREATED)
 
     def list(self, request):
-        reports = Report.objects.all()
+        reports = self.filter_queryset(self.get_queryset())
         serializer = ReportSerializer(reports, many=True)
         return Response(serializer.data)
 

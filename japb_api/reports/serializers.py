@@ -1,5 +1,7 @@
+import django_filters
 from rest_framework import serializers
 from .models import Report
+from japb_api.accounts.models import Account
 
 class ReportSerializer(serializers.ModelSerializer):
     class Meta:
@@ -26,3 +28,10 @@ class ReportSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         ]
+
+class ReportFilterSet(django_filters.FilterSet):
+    account = django_filters.ModelChoiceFilter(queryset=Account.objects.all())
+
+    class Meta:
+        model = Report
+        fields = ('account',)
