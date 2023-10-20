@@ -10,6 +10,7 @@ from .currencies.views import CurrencyViewSet
 from .accounts.views import AccountViewSet
 from .transactions.views import TransactionViewSet, CurrencyExchangeViewSet
 from .receivables.views import ReceivableViewSet
+from .reports.views import ReportViewSet 
 
 router = DefaultRouter()
 router.register(r'users', UserViewSet)
@@ -19,6 +20,7 @@ router.register(r'accounts', AccountViewSet, basename='accounts')
 router.register(r'transactions', TransactionViewSet, basename='transactions')
 router.register(r'exchanges', CurrencyExchangeViewSet, basename='exchanges')
 router.register(r'receivables', ReceivableViewSet, basename='receivables')
+router.register(r'reports', ReportViewSet, basename='reports')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
