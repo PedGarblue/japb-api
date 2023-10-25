@@ -102,10 +102,11 @@ class TestReportViews(APITestCase):
         self.assertEqual(len(json_data), 1)
         self.assertEqual(json_data[0]['from_date'], '2023-01-01')
         self.assertEqual(json_data[0]['to_date'], '2023-01-31')
-        self.assertEqual(json_data[0]['initial_balance'], 6000)
-        self.assertEqual(json_data[0]['end_balance'], 6010)
-        self.assertEqual(json_data[0]['total_income'], 4110)
-        self.assertEqual(json_data[0]['total_expenses'], -4100)
+        self.assertEqual(json_data[0]['initial_balance'], '60.00')
+        self.assertEqual(json_data[0]['end_balance'], '60.10')
+        self.assertEqual(json_data[0]['balance_status'], 'positive')
+        self.assertEqual(json_data[0]['total_income'], '41.10')
+        self.assertEqual(json_data[0]['total_expenses'], '-41.00')
 
     def test_api_lists_reports_by_account(self):
         account2 = Account.objects.create(name='Test Account 2', currency=self.currency)
@@ -123,10 +124,11 @@ class TestReportViews(APITestCase):
         self.assertEqual(len(json_data), 1)
         self.assertEqual(json_data[0]['from_date'], '2023-01-01')
         self.assertEqual(json_data[0]['to_date'], '2023-01-31')
-        self.assertEqual(json_data[0]['initial_balance'], 6000)
-        self.assertEqual(json_data[0]['end_balance'], 6010)
-        self.assertEqual(json_data[0]['total_income'], 4110)
-        self.assertEqual(json_data[0]['total_expenses'], -4100)
+        self.assertEqual(json_data[0]['initial_balance'], '60.00')
+        self.assertEqual(json_data[0]['end_balance'], '60.10')
+        self.assertEqual(json_data[0]['balance_status'], 'positive')
+        self.assertEqual(json_data[0]['total_income'], '41.10')
+        self.assertEqual(json_data[0]['total_expenses'], '-41.00')
 
     def test_api_get_report(self):
         Transaction.objects.bulk_create(self.transactions) 
@@ -140,10 +142,11 @@ class TestReportViews(APITestCase):
         json_data = response.json() 
         self.assertEqual(json_data['from_date'], '2023-01-01')
         self.assertEqual(json_data['to_date'], '2023-01-31')
-        self.assertEqual(json_data['initial_balance'], 6000)
-        self.assertEqual(json_data['end_balance'], 6010)
-        self.assertEqual(json_data['total_income'], 4110)
-        self.assertEqual(json_data['total_expenses'], -4100)
+        self.assertEqual(json_data['initial_balance'], '60.00')
+        self.assertEqual(json_data['end_balance'], '60.10')
+        self.assertEqual(json_data['balance_status'], 'positive')
+        self.assertEqual(json_data['total_income'], '41.10')
+        self.assertEqual(json_data['total_expenses'], '-41.00')
 
     def test_api_updates_report(self):
         self.client.post(reverse('reports-list'), self.data, format='json')
@@ -179,10 +182,11 @@ class TestReportViews(APITestCase):
         json_data = response.json() 
         self.assertEqual(json_data['from_date'], '2023-01-02')
         self.assertEqual(json_data['to_date'], '2023-01-30')
-        self.assertEqual(json_data['initial_balance'], 7064)
-        self.assertEqual(json_data['end_balance'], 6010)
-        self.assertEqual(json_data['total_income'], 3046)
-        self.assertEqual(json_data['total_expenses'], -4100)
+        self.assertEqual(json_data['initial_balance'], '70.64')
+        self.assertEqual(json_data['end_balance'], '60.10')
+        self.assertEqual(json_data['balance_status'], 'negative')
+        self.assertEqual(json_data['total_income'], '30.46')
+        self.assertEqual(json_data['total_expenses'], '-41.00')
     
     def test_api_deletes_report(self):
         Transaction.objects.bulk_create(self.transactions) 

@@ -44,9 +44,10 @@ class Common(Configuration):
         'django.middleware.clickjacking.XFrameOptionsMiddleware',
     )
     CORS_ALLOWED_ORIGINS = [
-        'http://localhost:3000'
+        'http://localhost:3000',
+        'http://192.168.1.107:3000'
     ]
-    ALLOWED_HOSTS = ["localhost"]
+    ALLOWED_HOSTS = ["localhost", "192.168.1.107"]
     ROOT_URLCONF = 'japb_api.urls'
     SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
     WSGI_APPLICATION = 'japb_api.wsgi.application'
