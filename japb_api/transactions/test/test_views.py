@@ -143,6 +143,26 @@ class TestCurrencyTransaction(APITestCase):
         self.assertEqual(response.json()[0]['description'], 'transaction 2')
         self.assertEqual(response.json()[1]['description'], 'transaction 3')
 
+    def test_api_get_transaction_by_account(self):
+        # add transacions to the account
+        account = self.account
+        account2 = Account.objects.create(name = 'Test Account 2', currency = self.currency)
+        transactions = [
+            Transaction(amount=10, description="transaction 1", account=account, date=datetime(2023, 1, 1, tzinfo=pytz.UTC)),
+            Transaction(amount=30, description="transaction 2", account=account, date=datetime(2023, 3, 1, tzinfo=pytz.UTC)),
+            Transaction(amount=25, description="transaction 3", account=account2, date=datetime(2023, 3, 1, tzinfo=pytz.UTC))
+        ]
+        Transaction.objects.bulk_create(transactions) 
+
+        url = reverse('transactions-list') + '?account=' + str(account.id)
+        response = self.client.get(url, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.json()), 3)
+        self.assertEqual(response.json()[0]['description'], 'transaction 2')
+        self.assertEqual(response.json()[1]['description'], 'transaction 1')
+        self.assertEqual(response.json()[2]['description'], 'Purchase')
+
     ### CURRENCY EXCHANGES
 
     # to create a Currency exchange the endpoint should create 2 related transactions

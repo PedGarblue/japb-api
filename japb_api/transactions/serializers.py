@@ -1,6 +1,7 @@
 import django_filters
 from rest_framework import serializers
 from .models import Transaction, CurrencyExchange
+from japb_api.accounts.models import Account
 
 class TransactionSerializer(serializers.ModelSerializer):
     class Meta:
@@ -27,8 +28,9 @@ class CurrencyExchangeSerializer(serializers.ModelSerializer):
 class TransactionFilterSet(django_filters.FilterSet):
     start_date = django_filters.DateFilter(field_name='date', lookup_expr='gte')
     end_date = django_filters.DateFilter(field_name='date', lookup_expr='lte')
+    account = django_filters.ModelChoiceFilter(queryset=Account.objects.all())
     
     class Meta: 
         model = Transaction
-        fields = ('start_date', 'end_date')
+        fields = ('start_date', 'end_date', 'account')
         
