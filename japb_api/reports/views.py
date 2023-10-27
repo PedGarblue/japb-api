@@ -5,14 +5,15 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
-from rest_framework import status, viewsets
+from rest_framework import status, viewsets, filters
 
 class ReportViewSet(viewsets.ModelViewSet):
     queryset = Report.objects.all()
     serializer_class = ReportSerializer
-    filter_backends = (DjangoFilterBackend,)
-    permission_classes = (AllowAny,)
+    filter_backends = (DjangoFilterBackend, filters.OrderingFilter)
     filterset_class = ReportFilterSet
+    ordering_fields = ['from_date']
+    permission_classes = (AllowAny,)
 
     def create(self, request):
         reports_data = request.data

@@ -130,6 +130,34 @@ class TestReportViews(APITestCase):
         self.assertEqual(json_data[0]['total_income'], '41.10')
         self.assertEqual(json_data[0]['total_expenses'], '-41.00')
 
+    def test_api_lists_and_sorts_reports_by_from_date(self):
+        reports = [
+            Report(
+                from_date=date(2023, 1, 1),
+                to_date=date(2023, 1, 31),
+                account=self.account,
+            ),
+            Report(
+                from_date=date(2023, 2, 1),
+                to_date=date(2023, 2, 28),
+                account=self.account,
+            ),
+            Report(
+                from_date=date(2023, 3, 1),
+                to_date=date(2023, 3, 31),
+                account=self.account,
+            ),
+        ]
+        Report.objects.bulk_create(reports)
+
+        response = self.client.get(reverse('reports-list'), { 'ordering': '-from_date' }, format='json')
+        json_data = response.json()
+
+        self.assertEquals(len(json_data), 3)
+        self.assertEquals(json_data[0]['from_date'], '2023-03-01')
+        self.assertEquals(json_data[1]['from_date'], '2023-02-01')
+        self.assertEquals(json_data[2]['from_date'], '2023-01-01')
+
     def test_api_get_report(self):
         Transaction.objects.bulk_create(self.transactions) 
         self.client.post(reverse('reports-list'), self.data, format='json')
