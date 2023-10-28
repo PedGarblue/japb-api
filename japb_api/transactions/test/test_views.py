@@ -142,6 +142,25 @@ class TestCurrencyTransaction(APITestCase):
         self.assertEqual(len(response.json()), 2)
         self.assertEqual(response.json()[0]['description'], 'transaction 2')
         self.assertEqual(response.json()[1]['description'], 'transaction 3')
+    
+    def test_api_get_transaction_by_datetime(self):
+        # add transacions to the account
+        account = self.account
+        transactions = [
+            Transaction(amount=10, description="transaction 1", account=account, date=datetime(2023, 1, 1, tzinfo=pytz.UTC)),
+            Transaction(amount=30, description="transaction 2", account=account, date=datetime(2023, 3, 1, tzinfo=pytz.UTC)),
+            Transaction(amount=25, description="transaction 3", account=account, date=datetime(2023, 3, 1, tzinfo=pytz.UTC))
+        ]
+        Transaction.objects.bulk_create(transactions) 
+
+        url = reverse('transactions-list') + '?start_date=2023-03-01T00:00:00Z&end_date=2023-03-01T23:59:59Z'
+        response = self.client.get(url, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Transaction.objects.count(), 4)
+        self.assertEqual(len(response.json()), 2)
+        self.assertEqual(response.json()[0]['description'], 'transaction 2')
+        self.assertEqual(response.json()[1]['description'], 'transaction 3')
 
     def test_api_get_transaction_by_account(self):
         # add transacions to the account

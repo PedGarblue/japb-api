@@ -26,8 +26,8 @@ class CurrencyExchangeSerializer(serializers.ModelSerializer):
         return rep
 
 class TransactionFilterSet(django_filters.FilterSet):
-    start_date = django_filters.DateFilter(field_name='date', lookup_expr='gte')
-    end_date = django_filters.DateFilter(field_name='date', lookup_expr='lte')
+    start_date = django_filters.DateTimeFilter(field_name='date', lookup_expr='gte')
+    end_date = django_filters.DateTimeFilter(field_name='date', lookup_expr='lte')
     account = django_filters.ModelChoiceFilter(queryset=Account.objects.all())
     
     class Meta: 
