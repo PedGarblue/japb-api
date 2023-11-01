@@ -1,12 +1,14 @@
 import pytz
 from datetime import datetime
+from datetime import date
 from django.test import TestCase
 from japb_api.currencies.models import Currency
 from japb_api.accounts.models import Account
 from japb_api.transactions.models import Transaction
-from japb_api.reports.models import Report
+from japb_api.reports.models import ReportAccount, ReportCurrency
+from japb_api.reports.factories import ReportAccountFactory
 
-class TestReportModel(TestCase):
+class TestReportAccountModel(TestCase):
     def setUp(self):
         self.currency = Currency.objects.create(name='Test Currency', symbol='T')
         self.account = Account.objects.create(name='Test Account', currency=self.currency)
@@ -50,7 +52,7 @@ class TestReportModel(TestCase):
             'to_date': datetime(2022, 12, 4, tzinfo=pytz.UTC),
             'account': self.account,
         }
-        report = Report.objects.create(**data)
+        report = ReportAccount.objects.create(**data)
 
         report.calculate_initial_balance()
 
@@ -63,7 +65,7 @@ class TestReportModel(TestCase):
             'to_date': datetime(2022, 12, 4, tzinfo=pytz.UTC),
             'account': self.account,
         }
-        report = Report.objects.create(**data)
+        report = ReportAccount.objects.create(**data)
         report.calculate_end_balance()
         self.assertEquals(report.end_balance, 7114)
     
@@ -74,7 +76,7 @@ class TestReportModel(TestCase):
             'to_date': datetime(2022, 12, 4, tzinfo=pytz.UTC),
             'account': self.account,
         }
-        report = Report.objects.create(**data)
+        report = ReportAccount.objects.create(**data)
         report.calculate_total_income()
         self.assertEquals(report.total_income, 1164)
 
@@ -85,7 +87,7 @@ class TestReportModel(TestCase):
             'to_date': datetime(2022, 12, 4, tzinfo=pytz.UTC),
             'account': self.account,
         }
-        report = Report.objects.create(**data)
+        report = ReportAccount.objects.create(**data)
         report.calculate_total_expenses()
         self.assertEquals(report.total_expenses, -50)
     
@@ -96,7 +98,7 @@ class TestReportModel(TestCase):
             'to_date': datetime(2022, 12, 4, tzinfo=pytz.UTC),
             'account': self.account,
         }
-        report = Report.objects.create(**data)
+        report = ReportAccount.objects.create(**data)
         report.calculate_initial_balance()
         report.calculate_end_balance()
         report.calculate_total_income()
@@ -106,3 +108,140 @@ class TestReportModel(TestCase):
         self.assertEquals(report.end_balance, 7114)
         self.assertEquals(report.total_income, 1164)
         self.assertEquals(report.total_expenses, -50)
+
+class TestReportCurrencyModel(TestCase):
+    def setUp(self):
+        self.currency = Currency.objects.create(name='Test Currency', symbol='T')
+        self.currency2 = Currency.objects.create(name='Test Currency 2', symbol='T2')
+        self.account1 = Account.objects.create(name='Test Account 1', currency=self.currency)
+        self.account2 = Account.objects.create(name='Test Account 2', currency=self.currency)
+        self.account3 = Account.objects.create(name='Test Account 3', currency=self.currency2)
+        self.data = {
+            'from_date': date(2020, 1, 1),
+            'to_date': date(2020, 1, 31),
+            'currency': self.currency,
+        }
+
+    def test_can_calculate_initial_balance(self):
+        ReportAccountFactory(initial_balance=200000, account=self.account1) 
+        ReportAccountFactory(initial_balance=200000, account=self.account2) 
+        # Not same currency
+        ReportAccountFactory(
+            account=self.account3
+        )
+        # Not in range
+        ReportAccountFactory(
+            from_date='2019-12-01',
+            to_date='2019-12-31',
+            initial_balance=30000,
+            account=self.account1
+        )
+        # Not in range
+        ReportAccountFactory(
+            from_date='2021-12-01',
+            to_date='2021-12-31',
+            initial_balance=30000,
+            account=self.account2
+        )
+
+        report = ReportCurrency.objects.create(**self.data)
+        report.calculate_initial_balance()
+
+        self.assertEquals(report.initial_balance, 400000)
+
+    def test_can_calculate_final_balance(self):
+        ReportAccountFactory(end_balance=400000, account=self.account1) 
+        ReportAccountFactory(end_balance=200000, account=self.account2) 
+        # Not same currency
+        ReportAccountFactory(
+            account=self.account3
+        )
+        # Not in range
+        ReportAccountFactory(
+            from_date='2019-12-01',
+            to_date='2019-12-31',
+            end_balance=30000,
+            account=self.account1
+        )
+        # Not in range
+        ReportAccountFactory(
+            from_date='2021-12-01',
+            to_date='2021-12-31',
+            end_balance=30000,
+            account=self.account2
+        )
+
+        report = ReportCurrency.objects.create(**self.data)
+        report.calculate_end_balance()
+
+        self.assertEquals(report.end_balance, 600000)
+    
+    def test_can_calculate_total_income(self):
+        ReportAccountFactory(total_income=1164, account=self.account1)
+        ReportAccountFactory(total_income=1000, account=self.account2)
+        # Not same currency
+        ReportAccountFactory(
+            account=self.account3
+        )
+        # Not in range
+        ReportAccountFactory(
+            from_date='2019-12-01',
+            to_date='2019-12-31',
+            total_income=3000,
+            account=self.account1
+        )
+        # Not in range
+        ReportAccountFactory(
+            from_date='2021-12-01',
+            to_date='2021-12-31',
+            total_income=30000,
+            account=self.account2
+        )
+
+        report = ReportCurrency.objects.create(**self.data)
+        report.calculate_total_income()
+
+        self.assertEquals(report.total_income, 2164)
+
+    def test_can_calculate_total_expenses(self):
+        ReportAccountFactory(total_expenses=-50, account=self.account1)
+        ReportAccountFactory(total_expenses=-100, account=self.account2)
+        # Not same currency
+        ReportAccountFactory(
+            account=self.account3
+        )
+        # Not in range
+        ReportAccountFactory(
+            from_date='2019-12-01',
+            to_date='2019-12-31',
+            total_expenses=3000,
+            account=self.account1
+        )
+        # Not in range
+        ReportAccountFactory(
+            from_date='2021-12-01',
+            to_date='2021-12-31',
+            total_expenses=30000,
+            account=self.account2
+        )
+
+        report = ReportCurrency.objects.create(**self.data)
+        report.calculate_total_expenses()
+
+        self.assertEquals(report.total_expenses, -150)
+    
+    def test_can_calculate_all_fields(self):
+        ReportAccountFactory(initial_balance=6000, end_balance=7114, total_income=1164, total_expenses=-50, account=self.account1)
+        ReportAccountFactory(initial_balance=6000, end_balance=7114, total_income=1164, total_expenses=-50, account=self.account2)
+
+        report = ReportCurrency.objects.create(**self.data)
+
+        report.calculate_initial_balance()
+        report.calculate_end_balance()
+        report.calculate_total_income()
+        report.calculate_total_expenses()
+
+        self.assertEquals(report.initial_balance, 12000)
+        self.assertEquals(report.end_balance, 14228)
+        self.assertEquals(report.total_income, 2328)
+        self.assertEquals(report.total_expenses, -100)
