@@ -10,6 +10,7 @@ from ..models import ReportAccount, ReportCurrency
 from japb_api.accounts.models import Account
 from japb_api.currencies.models import Currency
 from japb_api.transactions.models import Transaction
+from japb_api.transactions.factories import TransactionFactory, CurrencyExchangeFactory
 from japb_api.reports.factories import ReportAccountFactory, ReportCurrencyFactory
 from japb_api.accounts.factories import AccountFactory
 
@@ -245,6 +246,9 @@ class TestReportCurrencyViews(APITestCase):
         }
     
     def test_api_create_report(self):
+        TransactionFactory.create_batch(2, account=self.account1, date=datetime(2023, 1, 1, tzinfo=pytz.UTC), amount=75000)
+        TransactionFactory.create_batch(2, account=self.account2, date=datetime(2023, 1, 1, tzinfo=pytz.UTC), amount=-25000)
+
         ReportAccountFactory(
             from_date=date(2023, 1, 1),
             to_date=date(2023, 1, 31),
@@ -255,12 +259,25 @@ class TestReportCurrencyViews(APITestCase):
             to_date=date(2023, 1, 31),
             account=self.account2,
         )
+
         # not same currency and out of date range
         ReportAccountFactory(
             from_date=date(2022, 1, 1),
             to_date=date(2022, 1, 31),
             account= self.account3,
         )
+        TransactionFactory(account=self.account3, date=datetime(2023, 1, 1, tzinfo=pytz.UTC), amount=75000)
+        # same currency exchange Transactions
+        ex1 = CurrencyExchangeFactory(account=self.account2, amount=7000, date=datetime(2023, 1, 1, tzinfo=pytz.UTC))
+        ex2 = CurrencyExchangeFactory(account=self.account1, related_transaction = ex1, amount=-7000, date=datetime(2023, 1, 1, tzinfo=pytz.UTC))
+        ex1.related_transaction = ex2
+        ex1.save()
+
+        # other currency exchange Transactions
+        ex3 = CurrencyExchangeFactory(account=self.account2, amount=7000, date=datetime(2023, 1, 1, tzinfo=pytz.UTC))
+        ex4 = CurrencyExchangeFactory(account=self.account3, related_transaction = ex1, amount=-7000, date=datetime(2023, 1, 1, tzinfo=pytz.UTC))
+        ex3.related_transaction = ex4
+        ex3.save()
 
         response = self.client.post(reverse('reports-currency-list'), self.data, format='json')
         db_report = ReportCurrency.objects.get()
@@ -271,7 +288,7 @@ class TestReportCurrencyViews(APITestCase):
         self.assertEqual(db_report.to_date, date(2023, 1, 31))
         self.assertEqual(db_report.initial_balance, 400000)
         self.assertEqual(db_report.end_balance, 500000)
-        self.assertEqual(db_report.total_income, 150000)
+        self.assertEqual(db_report.total_income, 157000)
         self.assertEqual(db_report.total_expenses, -50000)
         self.assertEqual(db_report.currency.id, self.currency.id)
 
@@ -406,6 +423,8 @@ class TestReportCurrencyViews(APITestCase):
             account=self.account2,
         )
         report = ReportCurrencyFactory(currency=self.currency)
+        TransactionFactory.create_batch(2, account=self.account1, date=datetime(2023, 1, 1, tzinfo=pytz.UTC), amount=75000)
+        TransactionFactory.create_batch(2, account=self.account2, date=datetime(2023, 1, 1, tzinfo=pytz.UTC), amount=-25000)
 
         url = reverse('reports-currency-detail', kwargs={ 'pk': report.id })
         data = {

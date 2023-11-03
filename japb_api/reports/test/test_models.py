@@ -5,13 +5,17 @@ from django.test import TestCase
 from japb_api.currencies.models import Currency
 from japb_api.accounts.models import Account
 from japb_api.transactions.models import Transaction
+from japb_api.transactions.factories import TransactionFactory, CurrencyExchangeFactory
 from japb_api.reports.models import ReportAccount, ReportCurrency
 from japb_api.reports.factories import ReportAccountFactory
 
 class TestReportAccountModel(TestCase):
     def setUp(self):
         self.currency = Currency.objects.create(name='Test Currency', symbol='T')
+        self.currency2 = Currency.objects.create(name='Test Currency', symbol='T')
         self.account = Account.objects.create(name='Test Account', currency=self.currency)
+        self.account2 = Account.objects.create(name='Test Account 2', currency=self.currency)
+        self.account3 = Account.objects.create(name='Test Account 2', currency=self.currency2)
         self.transactions = [
             Transaction(
                 amount= 6000,
@@ -177,62 +181,70 @@ class TestReportCurrencyModel(TestCase):
         self.assertEquals(report.end_balance, 600000)
     
     def test_can_calculate_total_income(self):
-        ReportAccountFactory(total_income=1164, account=self.account1)
-        ReportAccountFactory(total_income=1000, account=self.account2)
+        TransactionFactory.create_batch(2, amount=1000, account=self.account1, date=datetime(2020, 1, 1, tzinfo=pytz.UTC))
+        TransactionFactory.create_batch(2, amount=1000, account=self.account2, date=datetime(2020, 1, 31, tzinfo=pytz.UTC))
         # Not same currency
-        ReportAccountFactory(
+        TransactionFactory(
             account=self.account3
         )
         # Not in range
-        ReportAccountFactory(
-            from_date='2019-12-01',
-            to_date='2019-12-31',
-            total_income=3000,
-            account=self.account1
+        TransactionFactory(
+            date=datetime(2019, 12, 1, tzinfo=pytz.UTC),
         )
         # Not in range
-        ReportAccountFactory(
-            from_date='2021-12-01',
-            to_date='2021-12-31',
-            total_income=30000,
-            account=self.account2
+        TransactionFactory(
+            date=datetime(2020, 2, 1, tzinfo=pytz.UTC),
         )
+        # same currency exchange Transactions
+        ex1 = CurrencyExchangeFactory(account=self.account1, amount=-2000, date=datetime(2020, 1, 1, tzinfo=pytz.UTC))
+        ex2 = CurrencyExchangeFactory(account=self.account2, related_transaction = ex1, amount=2000, date=datetime(2020, 1, 1, tzinfo=pytz.UTC))
+        ex1.related_transaction = ex2
+        ex1.save()
+
+        # other currency exchange Transactions
+        ex3 = CurrencyExchangeFactory(account=self.account1, amount=2000)
+        ex4 = CurrencyExchangeFactory(account=self.account3, related_transaction = ex3)
+        ex3.related_transaction = ex4
+        ex3.save()
 
         report = ReportCurrency.objects.create(**self.data)
         report.calculate_total_income()
 
-        self.assertEquals(report.total_income, 2164)
+        self.assertEqual(report.total_income, 6000)
 
     def test_can_calculate_total_expenses(self):
-        ReportAccountFactory(total_expenses=-50, account=self.account1)
-        ReportAccountFactory(total_expenses=-100, account=self.account2)
+        TransactionFactory.create_batch(2, amount=-40, account=self.account1, date=datetime(2020, 1, 1, tzinfo=pytz.UTC))
+        TransactionFactory.create_batch(2, amount=-40, account=self.account2, date=datetime(2020, 1, 31, tzinfo=pytz.UTC))
         # Not same currency
-        ReportAccountFactory(
-            account=self.account3
+        TransactionFactory(account=self.account3, amount=-37.5)
+        # Not in range
+        TransactionFactory(
+            date=datetime(2019, 12, 1, tzinfo=pytz.UTC),
+            amount=-37.5
         )
         # Not in range
-        ReportAccountFactory(
-            from_date='2019-12-01',
-            to_date='2019-12-31',
-            total_expenses=3000,
-            account=self.account1
+        TransactionFactory(
+            date=datetime(2020, 2, 1, tzinfo=pytz.UTC),
+            amount=-37.5
         )
-        # Not in range
-        ReportAccountFactory(
-            from_date='2021-12-01',
-            to_date='2021-12-31',
-            total_expenses=30000,
-            account=self.account2
-        )
+        # same currency exchange Transactions
+        ex1 = CurrencyExchangeFactory(amount=-75)
+        ex2 = CurrencyExchangeFactory(related_transaction = ex1, amount=-75)
+        ex1.related_transaction = ex2
+        ex1.save()
 
         report = ReportCurrency.objects.create(**self.data)
         report.calculate_total_expenses()
 
-        self.assertEquals(report.total_expenses, -150)
+        self.assertEquals(report.total_expenses, -160)
     
     def test_can_calculate_all_fields(self):
         ReportAccountFactory(initial_balance=6000, end_balance=7114, total_income=1164, total_expenses=-50, account=self.account1)
         ReportAccountFactory(initial_balance=6000, end_balance=7114, total_income=1164, total_expenses=-50, account=self.account2)
+        TransactionFactory(amount=1164, account=self.account1, date=datetime(2020, 1, 1, tzinfo=pytz.UTC))
+        TransactionFactory(amount=1164, account=self.account2, date=datetime(2020, 1, 1, tzinfo=pytz.UTC))
+        TransactionFactory(amount=-50, account=self.account1, date=datetime(2020, 1, 1, tzinfo=pytz.UTC))
+        TransactionFactory(amount=-50, account=self.account2, date=datetime(2020, 1, 1, tzinfo=pytz.UTC))
 
         report = ReportCurrency.objects.create(**self.data)
 
