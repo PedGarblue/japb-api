@@ -59,6 +59,7 @@ class ReportCurrencySerializer(serializers.ModelSerializer):
     class Meta:
         model = ReportCurrency
         fields = [
+            'id',
             'from_date',
             'to_date',
             'initial_balance',

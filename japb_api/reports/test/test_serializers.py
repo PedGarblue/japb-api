@@ -90,6 +90,7 @@ class CurrencyReportSerializerTestCase(TestCase):
         def test_contains_expected_fields(self):
             data = self.serializer.data
             self.assertCountEqual(data.keys(), [
+                'id',
                 'from_date',
                 'to_date',
                 'initial_balance',
