@@ -8,7 +8,7 @@ from rest_framework.authtoken import views
 from .users.views import UserViewSet, UserCreateViewSet
 from .currencies.views import CurrencyViewSet
 from .accounts.views import AccountViewSet
-from .transactions.views import TransactionViewSet, CurrencyExchangeViewSet
+from .transactions.views import TransactionViewSet, CurrencyExchangeViewSet, CategoryViewSet
 from .receivables.views import ReceivableViewSet
 from .reports.views import ReportAccountViewSet, ReportCurrencyViewSet
 
@@ -18,6 +18,7 @@ router.register(r'users', UserCreateViewSet)
 router.register(r'currencies', CurrencyViewSet, basename='currencies')
 router.register(r'accounts', AccountViewSet, basename='accounts')
 router.register(r'transactions', TransactionViewSet, basename='transactions')
+router.register(r'categories', CategoryViewSet, basename='categories')
 router.register(r'exchanges', CurrencyExchangeViewSet, basename='exchanges')
 router.register(r'receivables', ReceivableViewSet, basename='receivables')
 router.register(r'reports', ReportAccountViewSet, basename='reports')

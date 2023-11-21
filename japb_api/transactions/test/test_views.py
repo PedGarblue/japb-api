@@ -5,33 +5,37 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from ..models import Transaction, CurrencyExchange
+from ..models import Transaction, CurrencyExchange, Category
 from .factories import TransactionFactory
 from japb_api.accounts.models import Account
-from japb_api.accounts.models import Currency
+from japb_api.currencies.models import Currency
 
 class TestCurrencyTransaction(APITestCase):
     def setUp(self):
         self.fake = Faker(['en-US'])
         self.currency = Currency.objects.create(name = 'USD')
         self.account = Account.objects.create(name = 'Test Account', currency = self.currency)
+        self.category = Category.objects.create(name = 'Food', color = '#000000', description = 'Food expenses')
         self.data = {
             'amount': -50,
             'description': 'Purchase',
             'account': self.account.id,
             'date': datetime.now(tz=timezone.utc),
+            'category': self.category.id
         }
         self.data2 = {
             'amount': -30,
             'description': 'Purchase2',
             'account': self.account.id,
             'date': datetime.now(tz=timezone.utc),
+            'category': self.category.id
         }
         self.data3 = {
             'amount': -500,
             'description': 'Purchase3',
             'account': self.account.id,
             'date': datetime.now(tz=timezone.utc),
+            'category': self.category.id
         }
 
         self.response = self.client.post(
@@ -45,6 +49,7 @@ class TestCurrencyTransaction(APITestCase):
         self.assertEqual(Transaction.objects.count(), 1)
         transaction = Transaction.objects.get()
         self.assertEqual(transaction.description, 'Purchase')
+        self.assertEqual(transaction.category, self.category)
         self.assertEqual(transaction.amount, -5000)
 
     def test_api_create_transaction_handles_decimal_places(self):
@@ -88,7 +93,8 @@ class TestCurrencyTransaction(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(Transaction.objects.count(), 1)
         # amount
-        self.assertEqual(response.json()[0]['amount'], '-50.00')
+        self.assertEquals(response.json()[0]['amount'], '-50.00')
+        self.assertEquals(response.json()[0]['category'], self.category.id)
 
     def test_api_get_a_transaction(self):
         transaction = Transaction.objects.get()
@@ -96,6 +102,7 @@ class TestCurrencyTransaction(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json()['amount'], '-50.00')
+        self.assertEquals(response.json()['category'], self.category.id)
         self.assertEqual(Transaction.objects.count(), 1)
 
     def test_api_get_a_transaction_not_found(self):
@@ -274,3 +281,83 @@ class TestCurrencyTransaction(APITestCase):
         self.assertEqual(response_delete.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(CurrencyExchange.objects.count(), 0)
         
+class TestCategories(APITestCase):
+    def setUp(self):
+        self.fake = Faker(['en-US'])
+        self.currency = Currency.objects.create(name = 'USD')
+        self.account = Account.objects.create(name = 'Test Account', currency = self.currency)
+        self.data = {
+            'amount': -50,
+            'description': 'Purchase',
+            'account': self.account.id,
+            'date': datetime.now(tz=timezone.utc),
+        }
+        self.response = self.client.post(
+            reverse('transactions-list'),
+            self.data,
+            format = 'json'
+        )
+
+    def test_api_create_category(self):
+        data = {
+            'name': 'Food',
+            'description': 'Food expenses',
+            'color': '#000000',
+        }
+        response = self.client.post(
+            reverse('categories-list'),
+            data,
+            format = 'json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()[0]['name'], 'Food')
+        self.assertEqual(response.json()[0]['description'], 'Food expenses')
+        self.assertEqual(response.json()[0]['color'], '#000000')
+        self.assertEqual(response.json()[0]['parent_category'], None)
+
+    def test_api_create_category_with_parent(self):
+        parent = {
+            'name': 'Food',
+            'description': 'Food expenses',
+            'color': '#000000',
+        }
+        parent_response = self.client.post(
+            reverse('categories-list'),
+            parent,
+            format = 'json'
+        )
+        parent_id = parent_response.json()[0]['id']
+        data = {
+            'name': 'Groceries',
+            'description': 'Groceries expenses',
+            'color': '#000000',
+            'parent_category': parent_id
+        }
+        response = self.client.post(
+            reverse('categories-list'),
+            data,
+            format = 'json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()[0]['name'], 'Groceries')
+        self.assertEqual(response.json()[0]['description'], 'Groceries expenses')
+        self.assertEqual(response.json()[0]['color'], '#000000')
+        self.assertEqual(response.json()[0]['parent_category'], parent_id)
+
+    def test_get_categories(self):
+        data = {
+            'name': 'Food',
+            'description': 'Food expenses',
+            'color': '#000000',
+        }
+        response = self.client.post(
+            reverse('categories-list'),
+            data,
+            format = 'json'
+        )
+        response = self.client.get(reverse('categories-list'), format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()[0]['name'], 'Food')
+        self.assertEqual(response.json()[0]['description'], 'Food expenses')
+        self.assertEqual(response.json()[0]['color'], '#000000')
+        self.assertEqual(response.json()[0]['parent_category'], None)

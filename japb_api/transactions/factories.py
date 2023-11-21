@@ -1,7 +1,7 @@
 import factory
 from factory.django import DjangoModelFactory
 
-from japb_api.transactions.models import Transaction, CurrencyExchange
+from japb_api.transactions.models import Transaction, CurrencyExchange, Category
 from japb_api.accounts.factories import AccountFactory
 
 
@@ -28,3 +28,13 @@ class CurrencyExchangeFactory(DjangoModelFactory):
     created_at = '2020-01-01T00:00:00Z'
     updated_at = '2020-01-01T00:00:00Z'
    
+class CategoryFactory(DjangoModelFactory):
+    class Meta:
+        model = Category
+    
+    name = 'test category'
+    description = 'test category description'
+    color = '#ffffff'
+    parent_category = None
+    created_at = '2020-01-01T00:00:00Z'
+    updated_at = '2020-01-01T00:00:00Z'

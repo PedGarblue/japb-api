@@ -4,8 +4,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from django_filters.rest_framework import DjangoFilterBackend
 from ..accounts.models import Account
-from .models import Transaction, CurrencyExchange
-from .serializers import TransactionSerializer, CurrencyExchangeSerializer, TransactionFilterSet
+from .models import Transaction, CurrencyExchange, Category
+from .serializers import TransactionSerializer, CurrencyExchangeSerializer, CategorySerializer, TransactionFilterSet
     
 def parse_amount(amount, decimal_places):
     return int(amount * (10 ** decimal_places))
@@ -123,3 +123,53 @@ class CurrencyExchangeViewSet(viewsets.ModelViewSet):
             from_account_transaction.save()
             return Response([transaction_from_serializer.data, transaction_to_serializer.data], status = status.HTTP_201_CREATED) 
         return Response([transaction_from_serializer.errors, transaction_to_serializer.errors], status = status.HTTP_400_BAD_REQUEST) 
+    
+class CategoryViewSet(viewsets.ModelViewSet):
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+    filter_backends = (DjangoFilterBackend, filters.OrderingFilter)
+    ordering_fields = ['name']
+    permission_classes = (AllowAny,)
+
+    def create(self, request):
+        categories_data = request.data
+        if not isinstance(categories_data, list):
+            categories_data = [categories_data]
+
+        created_categories = []
+        for category_data in categories_data:
+            category_serializer = self.get_serializer(data=category_data)
+            if category_serializer.is_valid():
+                category = category_serializer.save()
+                created_categories.append(category_serializer.data)
+            else:
+                return Response(category_serializer.errors,
+                                status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(created_categories, status=status.HTTP_201_CREATED)
+
+    def list(self, request):
+        categories = self.filter_queryset(self.get_queryset())
+        serializer = CategorySerializer(categories, many=True)
+        return Response(serializer.data)
+
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
+
+    def update(self, request, pk = None):
+        try:
+            category = Category.objects.get(pk = pk)
+        except Category.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        serializer = CategorySerializer(category, data=request.data)
+
+        if serializer.is_valid():
+            category = serializer.save()
+            return Response(serializer.data)
+        else:
+            return Response(serializer.errors,
+                            status=status.HTTP_400_BAD_REQUEST)
+    
+    def destroy(self, request, *args, **kwargs):
+        return super().destroy(request, *args, **kwargs)
