@@ -49,6 +49,7 @@ class TestTransactionCategoryModel(TestCase):
         self.assertEqual(category.name, 'test category')
         self.assertEqual(category.description, 'test category description')
         self.assertEqual(category.color, '#ffffff')
+        self.assertEqual(category.type, 'expense')
     
     def test_category_with_parent_category(self) -> None:
         parent_category = CategoryFactory(name = 'test parent category')

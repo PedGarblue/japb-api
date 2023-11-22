@@ -290,6 +290,7 @@ class TestCategories(APITestCase):
             'amount': -50,
             'description': 'Purchase',
             'account': self.account.id,
+            'type': 'expense',
             'date': datetime.now(tz=timezone.utc),
         }
         self.response = self.client.post(
@@ -303,6 +304,7 @@ class TestCategories(APITestCase):
             'name': 'Food',
             'description': 'Food expenses',
             'color': '#000000',
+            'type': 'expense',
         }
         response = self.client.post(
             reverse('categories-list'),
@@ -314,12 +316,14 @@ class TestCategories(APITestCase):
         self.assertEqual(response.json()[0]['description'], 'Food expenses')
         self.assertEqual(response.json()[0]['color'], '#000000')
         self.assertEqual(response.json()[0]['parent_category'], None)
+        self.assertEqual(response.json()[0]['type'], 'expense')
 
     def test_api_create_category_with_parent(self):
         parent = {
             'name': 'Food',
             'description': 'Food expenses',
             'color': '#000000',
+            'type': 'expense',
         }
         parent_response = self.client.post(
             reverse('categories-list'),
@@ -343,12 +347,14 @@ class TestCategories(APITestCase):
         self.assertEqual(response.json()[0]['description'], 'Groceries expenses')
         self.assertEqual(response.json()[0]['color'], '#000000')
         self.assertEqual(response.json()[0]['parent_category'], parent_id)
+        self.assertEqual(response.json()[0]['type'], 'expense')
 
     def test_get_categories(self):
         data = {
             'name': 'Food',
             'description': 'Food expenses',
             'color': '#000000',
+            'type': 'expense',
         }
         response = self.client.post(
             reverse('categories-list'),
@@ -361,3 +367,4 @@ class TestCategories(APITestCase):
         self.assertEqual(response.json()[0]['description'], 'Food expenses')
         self.assertEqual(response.json()[0]['color'], '#000000')
         self.assertEqual(response.json()[0]['parent_category'], None)
+        self.assertEqual(response.json()[0]['type'], 'expense')

@@ -37,5 +37,7 @@ class CategoryFactory(factory.django.DjangoModelFactory):
     id = factory.Sequence(lambda n: f'{n}')
     name = factory.Faker('name')
     parent_category = factory.Sequence(lambda n: f'{n}')
+    color = factory.Faker('color')
+    type = 'expense'
     created_at = factory.Faker('date_time')
     updated_at = factory.Faker('date_time')

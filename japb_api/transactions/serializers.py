@@ -34,6 +34,7 @@ class CategorySerializer(serializers.ModelSerializer):
             'color',
             'description',
             'parent_category',
+            'type',
             'created_at',
             'updated_at',
         ]
