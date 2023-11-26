@@ -1,0 +1,535 @@
+[
+    {
+        "model": "transactions.category",
+        "pk": 1,
+        "fields": {
+            "name": "food",
+            "color": "#C9F1B7",
+            "description": "General Food",
+            "parent_category": null,
+            "type": "expense",
+            "created_at": "2023-11-20T21:38:19.746Z",
+            "updated_at": "2023-11-20T21:38:19.746Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 2,
+        "fields": {
+            "name": "groceries",
+            "color": "#E54C4A",
+            "description": "Groceries",
+            "parent_category": 1,
+            "type": "expense",
+            "created_at": "2023-11-20T21:38:59.512Z",
+            "updated_at": "2023-11-20T21:38:59.512Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 3,
+        "fields": {
+            "name": "restaurants",
+            "color": "#38BAFF",
+            "description": "Restaurants",
+            "parent_category": 1,
+            "type": "expense",
+            "created_at": "2023-11-20T21:39:14.512Z",
+            "updated_at": "2023-11-20T21:39:14.512Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 4,
+        "fields": {
+            "name": "transportation",
+            "color": "#35395A",
+            "description": "Transportation",
+            "parent_category": null,
+            "type": "expense",
+            "created_at": "2023-11-20T21:39:14.512Z",
+            "updated_at": "2023-11-20T21:39:14.512Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 8,
+        "fields": {
+            "name": "health",
+            "color": "#FF70D1",
+            "description": "Health",
+            "parent_category": null,
+            "type": "expense",
+            "created_at": "2023-11-20T21:39:14.512Z",
+            "updated_at": "2023-11-20T21:39:14.512Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 9,
+        "fields": {
+            "name": "doctor",
+            "color": "#00C7B1",
+            "description": "Doctor",
+            "parent_category": 8,
+            "type": "expense",
+            "created_at": "2023-11-20T21:39:14.512Z",
+            "updated_at": "2023-11-20T21:39:14.512Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 10,
+        "fields": {
+            "name": "Cheeses",
+            "color": "#F6F9AF",
+            "description": "Cheese",
+            "parent_category": 1,
+            "type": "expense",
+            "created_at": "2023-11-20T21:39:14.512Z",
+            "updated_at": "2023-11-20T21:39:14.512Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 11,
+        "fields": {
+            "name": "Hams and mortadellas",
+            "color": "#FF8D5E",
+            "description": "Hams and mortadellas",
+            "parent_category": 1,
+            "type": "expense",
+            "created_at": "2023-11-20T21:39:14.512Z",
+            "updated_at": "2023-11-20T21:39:14.512Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 13,
+        "fields": {
+            "name": "Juices and drinks",
+            "color": "#FF8A00",
+            "description": "Juices and drinks",
+            "parent_category": 1,
+            "type": "expense",
+            "created_at": "2023-11-20T21:39:14.512Z",
+            "updated_at": "2023-11-20T21:39:14.512Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 14,
+        "fields": {
+            "name": "Meats",
+            "color": "#AFFF5E",
+            "description": "Meats",
+            "parent_category": 1,
+            "type": "expense",
+            "created_at": "2023-11-20T21:39:14.512Z",
+            "updated_at": "2023-11-20T21:39:14.512Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 15,
+        "fields": {
+            "name": "colthes",
+            "color": "#dac2ff",
+            "description": "colthes",
+            "parent_category": null,
+            "type": "expense",
+            "created_at": "2023-11-25T19:03:54.001Z",
+            "updated_at": "2023-11-25T19:03:54.001Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 19,
+        "fields": {
+            "name": "Veggies and Fruits",
+            "color": "#9ae4a9",
+            "description": "Veggies and Fruits",
+            "parent_category": 1,
+            "type": "expense",
+            "created_at": "2023-11-25T21:21:09.811Z",
+            "updated_at": "2023-11-25T21:21:09.811Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 20,
+        "fields": {
+            "name": "car spares",
+            "color": "#757575",
+            "description": "car spares",
+            "parent_category": 4,
+            "type": "expense",
+            "created_at": "2023-11-25T23:53:29.168Z",
+            "updated_at": "2023-11-25T23:53:29.168Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 21,
+        "fields": {
+            "name": "Gasoline",
+            "color": "#d1cccc",
+            "description": "Gasoline",
+            "parent_category": 4,
+            "type": "expense",
+            "created_at": "2023-11-25T23:54:45.296Z",
+            "updated_at": "2023-11-25T23:54:45.296Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 22,
+        "fields": {
+            "name": "Sauses and Oils",
+            "color": "#bfbb4a",
+            "description": "Sauses and Oils",
+            "parent_category": 1,
+            "type": "expense",
+            "created_at": "2023-11-25T23:56:49.243Z",
+            "updated_at": "2023-11-25T23:56:49.243Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 23,
+        "fields": {
+            "name": "Other Foods",
+            "color": "#63622c",
+            "description": "Other Foods",
+            "parent_category": 1,
+            "type": "expense",
+            "created_at": "2023-11-25T23:57:19.078Z",
+            "updated_at": "2023-11-25T23:57:19.078Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 24,
+        "fields": {
+            "name": "Secos",
+            "color": "#d2d1b2",
+            "description": "Secos",
+            "parent_category": 1,
+            "type": "expense",
+            "created_at": "2023-11-25T23:59:25.040Z",
+            "updated_at": "2023-11-25T23:59:25.040Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 25,
+        "fields": {
+            "name": "Bread and Cereals",
+            "color": "#a8794d",
+            "description": "Bread and Cereals",
+            "parent_category": 1,
+            "type": "expense",
+            "created_at": "2023-11-26T00:00:06.120Z",
+            "updated_at": "2023-11-26T00:00:06.120Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 26,
+        "fields": {
+            "name": "Food Supplements",
+            "color": "#19016f",
+            "description": "Food Supplements",
+            "parent_category": 1,
+            "type": "expense",
+            "created_at": "2023-11-26T00:00:35.241Z",
+            "updated_at": "2023-11-26T00:00:35.241Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 28,
+        "fields": {
+            "name": "Gifts",
+            "color": "#ff4747",
+            "description": "Gifts",
+            "parent_category": null,
+            "type": "expense",
+            "created_at": "2023-11-26T00:02:48.808Z",
+            "updated_at": "2023-11-26T00:02:48.808Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 29,
+        "fields": {
+            "name": "Kitchen Supplies",
+            "color": "#f8ffe5",
+            "description": "Kitchen Supplies",
+            "parent_category": null,
+            "type": "expense",
+            "created_at": "2023-11-26T00:03:19.131Z",
+            "updated_at": "2023-11-26T00:03:19.131Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 30,
+        "fields": {
+            "name": "Home Supplies",
+            "color": "#8aadff",
+            "description": "Home Supplies",
+            "parent_category": null,
+            "type": "expense",
+            "created_at": "2023-11-26T00:03:51.260Z",
+            "updated_at": "2023-11-26T00:03:51.260Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 31,
+        "fields": {
+            "name": "Personal Stuff",
+            "color": "#f59a32",
+            "description": "Personal Stuff",
+            "parent_category": null,
+            "type": "expense",
+            "created_at": "2023-11-26T00:06:27.483Z",
+            "updated_at": "2023-11-26T00:06:27.483Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 32,
+        "fields": {
+            "name": "Pets",
+            "color": "#209d2f",
+            "description": "Pets",
+            "parent_category": null,
+            "type": "expense",
+            "created_at": "2023-11-26T00:06:50.561Z",
+            "updated_at": "2023-11-26T00:06:50.561Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 33,
+        "fields": {
+            "name": "Other Expenses",
+            "color": "#000000",
+            "description": "Other Expenses",
+            "parent_category": null,
+            "type": "expense",
+            "created_at": "2023-11-26T00:07:20.426Z",
+            "updated_at": "2023-11-26T00:07:20.426Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 34,
+        "fields": {
+            "name": "Comissions",
+            "color": "#f55151",
+            "description": "Comissions",
+            "parent_category": null,
+            "type": "expense",
+            "created_at": "2023-11-26T00:07:38.972Z",
+            "updated_at": "2023-11-26T00:07:38.972Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 35,
+        "fields": {
+            "name": "Gaming",
+            "color": "#cb489b",
+            "description": "Gaming",
+            "parent_category": null,
+            "type": "expense",
+            "created_at": "2023-11-26T00:07:54.013Z",
+            "updated_at": "2023-11-26T00:07:54.013Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 36,
+        "fields": {
+            "name": "Education",
+            "color": "#3cc3b3",
+            "description": "Education",
+            "parent_category": null,
+            "type": "expense",
+            "created_at": "2023-11-26T00:08:10.414Z",
+            "updated_at": "2023-11-26T00:08:10.414Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 37,
+        "fields": {
+            "name": "Higiene",
+            "color": "#28b6d2",
+            "description": "Higiene",
+            "parent_category": 31,
+            "type": "expense",
+            "created_at": "2023-11-26T00:08:40.737Z",
+            "updated_at": "2023-11-26T00:08:40.737Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 38,
+        "fields": {
+            "name": "Home Tools",
+            "color": "#6d4f37",
+            "description": "Home Tools",
+            "parent_category": 30,
+            "type": "expense",
+            "created_at": "2023-11-26T00:09:28.561Z",
+            "updated_at": "2023-11-26T00:09:28.561Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 39,
+        "fields": {
+            "name": "Investments",
+            "color": "#f5df51",
+            "description": "Investments",
+            "parent_category": null,
+            "type": "expense",
+            "created_at": "2023-11-26T00:11:34.233Z",
+            "updated_at": "2023-11-26T00:11:34.233Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 40,
+        "fields": {
+            "name": "Shipments",
+            "color": "#7b89b2",
+            "description": "Shipments",
+            "parent_category": 39,
+            "type": "expense",
+            "created_at": "2023-11-26T00:12:14.458Z",
+            "updated_at": "2023-11-26T00:12:14.458Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 41,
+        "fields": {
+            "name": "Donations",
+            "color": "#8e0dc9",
+            "description": "Donations",
+            "parent_category": null,
+            "type": "expense",
+            "created_at": "2023-11-26T00:12:48.713Z",
+            "updated_at": "2023-11-26T00:12:48.713Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 42,
+        "fields": {
+            "name": "Services",
+            "color": "#c90d71",
+            "description": "Services",
+            "parent_category": null,
+            "type": "expense",
+            "created_at": "2023-11-26T00:13:10.105Z",
+            "updated_at": "2023-11-26T00:13:10.105Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 43,
+        "fields": {
+            "name": "Missing",
+            "color": "#6b6b6b",
+            "description": "Missing",
+            "parent_category": null,
+            "type": "expense",
+            "created_at": "2023-11-26T00:13:32.416Z",
+            "updated_at": "2023-11-26T00:13:32.416Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 44,
+        "fields": {
+            "name": "Fun",
+            "color": "#b12020",
+            "description": "Fun",
+            "parent_category": null,
+            "type": "expense",
+            "created_at": "2023-11-26T00:15:42.169Z",
+            "updated_at": "2023-11-26T00:15:42.169Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 45,
+        "fields": {
+            "name": "Alcohol",
+            "color": "#b12020",
+            "description": "Alcohol",
+            "parent_category": 44,
+            "type": "expense",
+            "created_at": "2023-11-26T00:16:03.785Z",
+            "updated_at": "2023-11-26T00:16:03.785Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 46,
+        "fields": {
+            "name": "Taxes",
+            "color": "#890101",
+            "description": "Taxes",
+            "parent_category": null,
+            "type": "expense",
+            "created_at": "2023-11-26T00:17:01.523Z",
+            "updated_at": "2023-11-26T00:17:01.523Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 47,
+        "fields": {
+            "name": "Cleaning Products",
+            "color": "#d1fff6",
+            "description": "Cleaning Products",
+            "parent_category": 30,
+            "type": "expense",
+            "created_at": "2023-11-26T00:17:41.138Z",
+            "updated_at": "2023-11-26T00:17:41.138Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 48,
+        "fields": {
+            "name": "Father's Expenses",
+            "color": "#446f66",
+            "description": "Father's Expenses",
+            "parent_category": null,
+            "type": "expense",
+            "created_at": "2023-11-26T00:18:44.511Z",
+            "updated_at": "2023-11-26T00:18:44.511Z"
+        }
+    },
+    {
+        "model": "transactions.category",
+        "pk": 49,
+        "fields": {
+            "name": "Loans Given",
+            "color": "#c6ac2a",
+            "description": "Loans Given",
+            "parent_category": null,
+            "type": "expense",
+            "created_at": "2023-11-26T00:19:21.826Z",
+            "updated_at": "2023-11-26T00:19:21.826Z"
+        }
+    }
+]
