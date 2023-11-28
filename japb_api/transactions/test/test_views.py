@@ -229,6 +229,9 @@ class TestCurrencyTransaction(APITestCase):
         # created with the correct dates
         self.assertEqual(response_from.date, data_payload['date'])
         self.assertEqual(response_to.date, data_payload['date'])
+        # created with correct types
+        self.assertEqual(response_from.type, 'from_different_currency')
+        self.assertEqual(response_to.type, 'to_different_currency')
 
     def test_api_create_transaction_with_default_description(self):
         # the default description should be "Exchange from {from_account_name} to {to_account_name}"
@@ -253,6 +256,31 @@ class TestCurrencyTransaction(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response_from.description, f"Exchange from {from_account.name} to {to_account.name}")
+    
+    def test_api_create_transaction_and_sets_type(self):
+        # the type should be from_same_currency if the from_account and to_account are the same currency
+        to_currency = Currency.objects.create(name = 'USD')
+        from_account = self.account
+        to_account = Account.objects.create(name = 'Mercantil', currency = to_currency)
+        data_payload = {
+            'from_amount': '50.5',
+            'to_amount': 1250,
+            'from_account': from_account.id,
+            'to_account': to_account.id,
+            'date': datetime.now(tz=timezone.utc),
+        }
+        response = self.client.post(
+            reverse('exchanges-list'),
+            data_payload,
+            format = 'json'
+        )
+        transaction_response = response.json()
+        response_from = CurrencyExchange.objects.get(pk=transaction_response[0]['id'])
+        response_to = CurrencyExchange.objects.get(pk=transaction_response[1]['id'])
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response_from.type, 'from_same_currency')
+        self.assertEqual(response_to.type, 'to_same_currency')
         
     # should delete the 2 transactions created
     def test_api_delete_currency_exchange(self):

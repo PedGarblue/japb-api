@@ -17,7 +17,16 @@ class TransactionSerializer(serializers.ModelSerializer):
 class CurrencyExchangeSerializer(serializers.ModelSerializer):
     class Meta:
         model = CurrencyExchange
-        fields = ['id', 'amount', 'description', 'account', 'date', 'category', 'related_transaction']
+        fields = [
+            'id',
+            'amount',
+            'description',
+            'account',
+            'date',
+            'category',
+            'related_transaction'
+            'type',
+        ]
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)

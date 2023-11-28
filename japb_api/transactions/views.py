@@ -106,6 +106,14 @@ class CurrencyExchangeViewSet(viewsets.ModelViewSet):
             'description': description,
             'date': request.data['date'],
         }
+        # check if the from_account and to_account are the same currency
+        if account_from.currency == account_to.currency:
+            from_account_transaction_data['type'] = 'from_same_currency'
+            to_account_transaction_data['type'] = 'to_same_currency'
+        else:
+            from_account_transaction_data['type'] = 'from_different_currency'
+            to_account_transaction_data['type'] = 'to_different_currency'
+            
         transaction_from_serializer = self.get_serializer(data = from_account_transaction_data)
         transaction_to_serializer = self.get_serializer(data = to_account_transaction_data)
 

@@ -1,4 +1,5 @@
-from typing import Any
+import pytz
+from datetime import datetime, timezone
 from django.test import TestCase
 
 from japb_api.currencies.factories import CurrencyFactory
@@ -36,6 +37,21 @@ class TestCurrencyExchangeModel(TestCase):
         self.currency2 = CurrencyFactory()
         self.account = AccountFactory(currency = self.currency)
         self.account2 = AccountFactory(currency = self.currency)
+    
+    def test_currency_exchange_fields(self) -> None:
+        currency_exchange = CurrencyExchange.objects.create(
+            description = 'test currency exchange',
+            date = datetime.now(tz=timezone.utc),
+            account = self.account,
+            amount = 1000,
+            type='from_same_currency',
+            category = None,
+        )
+        self.assertEqual(currency_exchange.description, 'test currency exchange')
+        self.assertEqual(currency_exchange.account, self.account)
+        self.assertEqual(currency_exchange.amount, 1000)
+        self.assertEqual(currency_exchange.type, 'from_same_currency')
+    
 
 class TestTransactionCategoryModel(TestCase):
     def setUp(self) -> None:

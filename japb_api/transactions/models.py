@@ -13,7 +13,14 @@ class Transaction(models.Model):
         return f'{self.description} {self.amount}'
 
 class CurrencyExchange(Transaction):
+    TYPE_CHOICES = [
+        ('from_same_currency', 'from_same_currency'),
+        ('from_different_currency', 'from_different_currency'),
+        ('to_same_currency', 'to_same_currency'),
+        ('to_different_currency', 'to_different_currency'),
+    ]
     related_transaction = models.ForeignKey('self', null = True, on_delete=models.CASCADE)
+    type = models.CharField(max_length=50, choices=TYPE_CHOICES, default='from_same_currency')
 
 class Category(models.Model):
     TYPE_CHOICES = [
