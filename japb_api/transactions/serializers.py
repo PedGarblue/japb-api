@@ -24,7 +24,7 @@ class CurrencyExchangeSerializer(serializers.ModelSerializer):
             'account',
             'date',
             'category',
-            'related_transaction'
+            'related_transaction',
             'type',
         ]
 
