@@ -259,8 +259,8 @@ class TestCurrencyTransaction(APITestCase):
     
     def test_api_create_transaction_and_sets_type(self):
         # the type should be from_same_currency if the from_account and to_account are the same currency
-        to_currency = Currency.objects.create(name = 'USD')
         from_account = self.account
+        to_currency = Currency.objects.create(name = 'USD')
         to_account = Account.objects.create(name = 'Mercantil', currency = to_currency)
         data_payload = {
             'from_amount': '50.5',
@@ -279,8 +279,8 @@ class TestCurrencyTransaction(APITestCase):
         response_to = CurrencyExchange.objects.get(pk=transaction_response[1]['id'])
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response_from.type, 'from_same_currency')
-        self.assertEqual(response_to.type, 'to_same_currency')
+        self.assertEqual(response_from.type, 'from_different_currency')
+        self.assertEqual(response_to.type, 'to_different_currency')
         
     # should delete the 2 transactions created
     def test_api_delete_currency_exchange(self):
