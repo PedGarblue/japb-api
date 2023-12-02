@@ -22,6 +22,15 @@ class CurrencyExchange(Transaction):
     related_transaction = models.ForeignKey('self', null = True, on_delete=models.CASCADE)
     type = models.CharField(max_length=50, choices=TYPE_CHOICES, default='from_same_currency')
 
+class ExchangeComission(Transaction):
+    TYPE_CHOICES = [
+        ('comission', 'comission'),
+        ('profit', 'profit')
+    ]
+    exchange_from = models.ForeignKey('CurrencyExchange', related_name='exchange_from', null = True, on_delete=models.CASCADE)
+    exchange_to = models.ForeignKey('CurrencyExchange', related_name='exchange_to', null = True, on_delete=models.CASCADE)
+    type = models.CharField(max_length=50, choices=TYPE_CHOICES, default='comission')
+
 class Category(models.Model):
     TYPE_CHOICES = [
         ('expense', 'expense'),

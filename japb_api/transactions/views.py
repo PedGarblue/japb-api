@@ -5,7 +5,13 @@ from rest_framework.permissions import AllowAny
 from django_filters.rest_framework import DjangoFilterBackend
 from ..accounts.models import Account
 from .models import Transaction, CurrencyExchange, Category
-from .serializers import TransactionSerializer, CurrencyExchangeSerializer, CategorySerializer, TransactionFilterSet
+from .serializers import \
+    TransactionSerializer,\
+    CurrencyExchangeSerializer,\
+    ExchangeComissionSerializer,\
+    CategorySerializer,\
+    TransactionFilterSet\
+    
     
 def parse_amount(amount, decimal_places):
     return int(amount * (10 ** decimal_places))
@@ -94,8 +100,10 @@ class CurrencyExchangeViewSet(viewsets.ModelViewSet):
         to_decimal_places = account_to.decimal_places
         request.data['to_amount'] = parse_amount(to_amount, to_decimal_places)
 
+        comission_amount = request.data['from_amount'] - request.data['to_amount']
+
         from_account_transaction_data = {
-            'amount': -float(request.data['from_amount']),
+            'amount': -float(request.data['from_amount']) - (-comission_amount if account_from.currency == account_to.currency else 0),
             'account': request.data['from_account'],
             'description': description,
             'date': request.data['date'],
@@ -117,20 +125,47 @@ class CurrencyExchangeViewSet(viewsets.ModelViewSet):
         transaction_from_serializer = self.get_serializer(data = from_account_transaction_data)
         transaction_to_serializer = self.get_serializer(data = to_account_transaction_data)
 
-        if transaction_from_serializer.is_valid() and transaction_to_serializer.is_valid():
-            # Save the transactions first so we can set the related_transaction field
+        if transaction_from_serializer.is_valid():
             from_account_transaction = transaction_from_serializer.save()
+        else:
+            return Response({ 'from_data': transaction_from_serializer.errors }, status = status.HTTP_400_BAD_REQUEST)
+        
+        if transaction_to_serializer.is_valid():
             to_account_transaction = transaction_to_serializer.save()
+        else:
+            return Response({'to_data': transaction_to_serializer.errors}, status = status.HTTP_400_BAD_REQUEST)
+        
+        # Set the related_transaction field of the to_account_transaction
+        to_account_transaction.related_transaction = from_account_transaction
+        to_account_transaction.save()
 
-            # Set the related_transaction field of the to_account_transaction
-            to_account_transaction.related_transaction = from_account_transaction
-            to_account_transaction.save()
+        # Set the related_transaction field of the from_account_transaction
+        from_account_transaction.related_transaction = to_account_transaction
+        from_account_transaction.save()
 
-            # Set the related_transaction field of the from_account_transaction
-            from_account_transaction.related_transaction = to_account_transaction
-            from_account_transaction.save()
-            return Response([transaction_from_serializer.data, transaction_to_serializer.data], status = status.HTTP_201_CREATED) 
-        return Response([transaction_from_serializer.errors, transaction_to_serializer.errors], status = status.HTTP_400_BAD_REQUEST) 
+        response = [
+            transaction_from_serializer.data,
+            transaction_to_serializer.data,
+        ]
+        # Create the comission transaction
+        if account_from.currency == account_to.currency:
+            comission_transaction_data = {
+                'amount': request.data['to_amount'] - request.data['from_amount'],
+                'account': request.data['from_account'],
+                'description': f'Comission for {description}',
+                'date': request.data['date'],
+                'type': 'comission' if request.data['from_amount'] >= request.data['to_amount'] else 'profit',
+                'exchange_from': from_account_transaction.id,
+                'exchange_to': to_account_transaction.id,
+            }
+            comission_transaction_serializer = ExchangeComissionSerializer(data = comission_transaction_data)
+            if comission_transaction_serializer.is_valid():
+                comission_transaction_serializer.save()
+                response.append(comission_transaction_serializer.data)
+            else:
+                return Response({ 'comission_data': comission_transaction_serializer.errors }, status = status.HTTP_400_BAD_REQUEST)
+
+        return Response(response, status = status.HTTP_201_CREATED) 
     
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()

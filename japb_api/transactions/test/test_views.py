@@ -5,7 +5,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from ..models import Transaction, CurrencyExchange, Category
+from ..models import Transaction, CurrencyExchange, ExchangeComission, Category
 from .factories import TransactionFactory
 from japb_api.accounts.models import Account
 from japb_api.currencies.models import Currency
@@ -282,6 +282,41 @@ class TestCurrencyTransaction(APITestCase):
         self.assertEqual(response_from.type, 'from_different_currency')
         self.assertEqual(response_to.type, 'to_different_currency')
         
+    def test_api_create_transactions_and_comission_when_same_currency_exchange(self):
+        # the endpoint should create a comission transaction when the from_account and to_account are the same currency
+        from_account = self.account
+        to_account = Account.objects.create(name = 'Mercantil', currency = self.currency)
+        data_payload = {
+            'from_amount': '1250',
+            'to_amount': '1200',
+            'from_account': from_account.id,
+            'to_account': to_account.id,
+            'date': datetime.now(tz=timezone.utc),
+        }
+        response = self.client.post(
+            reverse('exchanges-list'),
+            data_payload,
+            format = 'json'
+        )
+        transaction_response = response.json()
+        response_from = CurrencyExchange.objects.get(pk=transaction_response[0]['id'])
+        response_to = CurrencyExchange.objects.get(pk=transaction_response[1]['id'])
+        response_comission = ExchangeComission.objects.get(pk=transaction_response[2]['id'])
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response_from.type, 'from_same_currency')
+        self.assertEqual(response_to.type, 'to_same_currency')
+        self.assertEqual(response_comission.type, 'comission')
+        # the comission transaction should be created with the correct amount
+        self.assertEqual(response_comission.amount, -5000)
+        # the comission transaction should be related to the other transactions
+        self.assertEqual(response_comission.exchange_from, response_from)
+        self.assertEqual(response_comission.exchange_to, response_to)
+        # rest the comission amount from the from_account
+        # the user never sends the comission amount, it's calculated by the endpoint
+        self.assertEqual(response_from.amount, -120000)
+        self.assertEqual(response_to.amount, 120000)
+
     # should delete the 2 transactions created
     def test_api_delete_currency_exchange(self):
         # delete the initial transaction

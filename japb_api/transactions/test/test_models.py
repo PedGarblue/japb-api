@@ -4,8 +4,8 @@ from django.test import TestCase
 
 from japb_api.currencies.factories import CurrencyFactory
 from japb_api.accounts.factories import AccountFactory
-from japb_api.transactions.models import Transaction, CurrencyExchange, Category
-from japb_api.transactions.factories import TransactionFactory, CategoryFactory
+from japb_api.transactions.models import Transaction, CurrencyExchange, ExchangeComission, Category
+from japb_api.transactions.factories import TransactionFactory, CategoryFactory, ExchangeComissionFactory
 
 class TestTransactionModel(TestCase):
     def setUp(self) -> None:
@@ -52,6 +52,36 @@ class TestCurrencyExchangeModel(TestCase):
         self.assertEqual(currency_exchange.amount, 1000)
         self.assertEqual(currency_exchange.type, 'from_same_currency')
     
+class TestExchangeCommision(TestCase):
+    def setUp(self) -> None:
+        self.currency = CurrencyFactory()
+        self.currency2 = CurrencyFactory()
+        self.account = AccountFactory(currency = self.currency)
+        self.account2 = AccountFactory(currency = self.currency)
+    
+    def test_exchange_comission_fields(self):
+        exchange1 = CurrencyExchange.objects.create(
+            description = 'test currency exchange',
+            date = datetime.now(tz=timezone.utc),
+            account = self.account,
+            amount = 1000,
+            type='from_same_currency',
+            category = None,
+        )
+        exchange2 = CurrencyExchange.objects.create(
+            description = 'test currency exchange',
+            date = datetime.now(tz=timezone.utc),
+            account = self.account,
+            amount = 1000,
+            type='from_same_currency',
+            category = None,
+        )
+        exchange_comission = ExchangeComissionFactory(account = self.account, exchange_from = exchange1, exchange_to = exchange2)
+        self.assertEqual(exchange_comission.amount, 1000)
+        self.assertEqual(exchange_comission.account, self.account)
+        self.assertEqual(exchange_comission.type, 'comission')
+        self.assertEqual(exchange_comission.exchange_from, exchange1)
+        self.assertEqual(exchange_comission.exchange_to, exchange2)
 
 class TestTransactionCategoryModel(TestCase):
     def setUp(self) -> None:

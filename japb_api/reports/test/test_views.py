@@ -266,16 +266,42 @@ class TestReportCurrencyViews(APITestCase):
             to_date=date(2022, 1, 31),
             account= self.account3,
         )
-        TransactionFactory(account=self.account3, date=datetime(2023, 1, 1, tzinfo=pytz.UTC), amount=75000)
-        # same currency exchange Transactions
-        ex1 = CurrencyExchangeFactory(account=self.account2, amount=7000, date=datetime(2023, 1, 1, tzinfo=pytz.UTC))
-        ex2 = CurrencyExchangeFactory(account=self.account1, related_transaction = ex1, amount=-7000, date=datetime(2023, 1, 1, tzinfo=pytz.UTC))
+        TransactionFactory(
+            account=self.account3,
+            date=datetime(2023, 1, 1, tzinfo=pytz.UTC),
+            amount=75000
+        )
+        # same currency exchanges should be ignored
+        ex1 = CurrencyExchangeFactory(
+            account=self.account2,
+            amount=-7000,
+            date=datetime(2023, 1, 1, tzinfo=pytz.UTC),
+            type = 'from_same_currency',
+        )
+        ex2 = CurrencyExchangeFactory(
+            account=self.account1,
+            related_transaction = ex1,
+            amount=7000,
+            date=datetime(2023, 1, 1, tzinfo=pytz.UTC),
+            type='to_same_currency',
+        )
         ex1.related_transaction = ex2
         ex1.save()
 
         # other currency exchange Transactions
-        ex3 = CurrencyExchangeFactory(account=self.account2, amount=7000, date=datetime(2023, 1, 1, tzinfo=pytz.UTC))
-        ex4 = CurrencyExchangeFactory(account=self.account3, related_transaction = ex1, amount=-7000, date=datetime(2023, 1, 1, tzinfo=pytz.UTC))
+        ex3 = CurrencyExchangeFactory(
+            account=self.account2,
+            amount=7000,
+            date=datetime(2023, 1, 1, tzinfo=pytz.UTC),
+            type='from_different_currency',
+        )
+        ex4 = CurrencyExchangeFactory(
+            account=self.account3,
+            related_transaction = ex1,
+            amount=-7000,
+            date=datetime(2023, 1, 1, tzinfo=pytz.UTC),
+            type='to_different_currency',
+        )
         ex3.related_transaction = ex4
         ex3.save()
 

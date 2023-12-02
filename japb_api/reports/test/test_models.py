@@ -196,14 +196,14 @@ class TestReportCurrencyModel(TestCase):
             date=datetime(2020, 2, 1, tzinfo=pytz.UTC),
         )
         # same currency exchange Transactions
-        ex1 = CurrencyExchangeFactory(account=self.account1, amount=-2000, date=datetime(2020, 1, 1, tzinfo=pytz.UTC))
-        ex2 = CurrencyExchangeFactory(account=self.account2, related_transaction = ex1, amount=2000, date=datetime(2020, 1, 1, tzinfo=pytz.UTC))
+        ex1 = CurrencyExchangeFactory(account=self.account1, amount=-2000, date=datetime(2020, 1, 1, tzinfo=pytz.UTC), type = 'from_same_currency')
+        ex2 = CurrencyExchangeFactory(account=self.account2, related_transaction = ex1, amount=2000, date=datetime(2020, 1, 1, tzinfo=pytz.UTC), type = 'to_same_currency')
         ex1.related_transaction = ex2
         ex1.save()
 
         # other currency exchange Transactions
-        ex3 = CurrencyExchangeFactory(account=self.account1, amount=2000)
-        ex4 = CurrencyExchangeFactory(account=self.account3, related_transaction = ex3)
+        ex3 = CurrencyExchangeFactory(account=self.account3, amount=-2000, type = 'from_different_currency', date=datetime(2020, 1, 1, tzinfo=pytz.UTC))
+        ex4 = CurrencyExchangeFactory(account=self.account1, related_transaction = ex3, amount=2000, type = 'to_different_currency', date=datetime(2020, 1, 1, tzinfo=pytz.UTC))
         ex3.related_transaction = ex4
         ex3.save()
 
@@ -213,8 +213,10 @@ class TestReportCurrencyModel(TestCase):
         self.assertEqual(report.total_income, 6000)
 
     def test_can_calculate_total_expenses(self):
+        # must be 160
         TransactionFactory.create_batch(2, amount=-40, account=self.account1, date=datetime(2020, 1, 1, tzinfo=pytz.UTC))
         TransactionFactory.create_batch(2, amount=-40, account=self.account2, date=datetime(2020, 1, 31, tzinfo=pytz.UTC))
+
         # Not same currency
         TransactionFactory(account=self.account3, amount=-37.5)
         # Not in range
@@ -227,9 +229,9 @@ class TestReportCurrencyModel(TestCase):
             date=datetime(2020, 2, 1, tzinfo=pytz.UTC),
             amount=-37.5
         )
-        # same currency exchange Transactions
-        ex1 = CurrencyExchangeFactory(amount=-75)
-        ex2 = CurrencyExchangeFactory(related_transaction = ex1, amount=-75)
+        # same currency exchange Transactions should not be counted
+        ex1 = CurrencyExchangeFactory(amount=-75, account=self.account1, date=datetime(2020, 1, 2, tzinfo=pytz.UTC), type='from_same_currency')
+        ex2 = CurrencyExchangeFactory(related_transaction = ex1, amount=75, account = self.account2, date=datetime(2020, 1, 2, tzinfo=pytz.UTC), type='to_same_currency')
         ex1.related_transaction = ex2
         ex1.save()
 

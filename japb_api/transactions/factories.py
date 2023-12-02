@@ -27,6 +27,20 @@ class CurrencyExchangeFactory(DjangoModelFactory):
     date = '2020-01-01T00:00:00Z'
     created_at = '2020-01-01T00:00:00Z'
     updated_at = '2020-01-01T00:00:00Z'
+
+class ExchangeComissionFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = 'transactions.ExchangeComission'
+
+    id = factory.Sequence(lambda n: f'{n}')
+    amount = 1000
+    account = factory.Sequence(lambda n: f'{n}')
+    date = factory.Faker('date_time')
+    type = 'comission'
+    exchange_from = factory.Sequence(lambda n: f'{n}')
+    exchange_to = factory.Sequence(lambda n: f'{n}')
+    created_at = factory.Faker('date_time')
+    updated_at = factory.Faker('date_time')
    
 class CategoryFactory(DjangoModelFactory):
     class Meta:

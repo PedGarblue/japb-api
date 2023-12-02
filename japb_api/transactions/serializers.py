@@ -1,6 +1,6 @@
 import django_filters
 from rest_framework import serializers
-from .models import Transaction, CurrencyExchange, Category
+from .models import Transaction, CurrencyExchange, ExchangeComission, Category
 from japb_api.accounts.models import Account
 
 class TransactionSerializer(serializers.ModelSerializer):
@@ -25,6 +25,27 @@ class CurrencyExchangeSerializer(serializers.ModelSerializer):
             'date',
             'category',
             'related_transaction',
+            'type',
+        ]
+
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        amount = rep.get('amount') / (10 ** instance.account.decimal_places)
+        rep['amount'] = f'{amount:.{instance.account.decimal_places}f}'
+        return rep
+    
+class ExchangeComissionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ExchangeComission
+        fields = [
+            'id',
+            'amount',
+            'description',
+            'account',
+            'date',
+            'category',
+            'exchange_from',
+            'exchange_to',
             'type',
         ]
 

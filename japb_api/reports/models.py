@@ -95,8 +95,7 @@ class ReportCurrency(Report):
     def calculate_total_income(self) -> 'ReportCurrency':
         exchanges_income_from_same_currency = self.get_exchanges_in_month_range()\
             .filter(
-                related_transaction__account__currency=self.currency,
-                amount__gt=0,
+                type = 'to_same_currency',
             )
         transactions = self.get_transactions_in_month_range()\
             .filter(
@@ -110,8 +109,7 @@ class ReportCurrency(Report):
     def calculate_total_expenses(self) -> 'ReportCurrency':
         exchanges_expense_from_same_currency = self.get_exchanges_in_month_range()\
             .filter(
-                related_transaction__account__currency=self.currency,
-                amount__lt=0,
+                type = 'from_same_currency',
             )
 
         transactions = self.get_transactions_in_month_range()\
