@@ -36,16 +36,4 @@ class Migration(migrations.Migration):
                 ).delete()
             ]
         ),
-        migrations.RunPython(
-            code=lambda apps, schema_editor: CurrencyExchange.objects.filter(
-                amount__lt=-F('related_transaction__amount'),
-                type='from_same_currency',
-            ).update(
-                amount=F('amount') - (F('amount') + Subquery(
-                    CurrencyExchange.objects.filter(
-                        id=F('related_transaction_id')
-                    ).values('amount')
-                )),
-            )
-        ),
     ]
