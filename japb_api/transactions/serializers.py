@@ -1,4 +1,5 @@
 import django_filters
+from django.db.models import F
 from rest_framework import serializers
 from .models import Transaction, CurrencyExchange, ExchangeComission, Category
 from japb_api.accounts.models import Account
@@ -79,8 +80,20 @@ class TransactionFilterSet(django_filters.FilterSet):
     start_date = django_filters.DateTimeFilter(field_name='date', lookup_expr='gte')
     end_date = django_filters.DateTimeFilter(field_name='date', lookup_expr='lte')
     account = django_filters.ModelChoiceFilter(queryset=Account.objects.all())
-    
+    exclude_same_currency_exchanges = django_filters.BooleanFilter(method='filter_exclude_same_currency_exchanges')
+    currency = django_filters.NumberFilter(field_name='account__currency', lookup_expr='exact')
+
+    def filter_exclude_same_currency_exchanges(self, queryset, name, value):
+        if value:
+            queryset = queryset.exclude(
+                id__in=CurrencyExchange.objects.filter(
+                    # match 'from_same_currency' and 'to_same_currency' types
+                    type__in=['from_same_currency', 'to_same_currency']
+                )
+            )
+        return queryset
+
     class Meta: 
         model = Transaction
-        fields = ('start_date', 'end_date', 'account')
+        fields = ('start_date', 'end_date', 'account', 'currency', 'exclude_same_currency_exchanges')
         

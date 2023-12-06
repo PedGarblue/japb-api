@@ -189,6 +189,65 @@ class TestCurrencyTransaction(APITestCase):
         self.assertEqual(response.json()[1]['description'], 'transaction 1')
         self.assertEqual(response.json()[2]['description'], 'Purchase')
 
+    def test_api_get_transaction_by_currency(self):
+        # add transacions to the account
+        selectedCurrency = Currency.objects.create(name = 'USD')
+        selectedAccount = Account.objects.create(name = 'Test Account 2', currency = selectedCurrency)
+        nonSelectedCurrency = Currency.objects.create(name = 'EUR')
+        account2 = Account.objects.create(name = 'Test Account 2', currency = nonSelectedCurrency)
+        transactions = [
+            Transaction(amount=10, description="transaction 1", account=selectedAccount, date=datetime(2023, 1, 1, tzinfo=pytz.UTC)),
+            Transaction(amount=30, description="transaction 2", account=selectedAccount, date=datetime(2023, 3, 1, tzinfo=pytz.UTC)),
+            Transaction(amount=40, description="transaction 3", account=selectedAccount, date=datetime(2023, 3, 1, tzinfo=pytz.UTC)),
+            Transaction(amount=25, description="transaction 4", account=account2, date=datetime(2023, 3, 1, tzinfo=pytz.UTC))
+        ]
+        Transaction.objects.bulk_create(transactions) 
+
+        url = reverse('transactions-list') + '?currency=' + str(selectedCurrency.id)
+        response = self.client.get(url, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.json()), 3)
+        self.assertEqual(response.json()[0]['description'], 'transaction 3')
+        self.assertEqual(response.json()[1]['description'], 'transaction 2')
+        self.assertEqual(response.json()[2]['description'], 'transaction 1')
+
+    def test_api_get_transaction_by_exclude_same_currency_exchanges(self):
+        # add transacions to the account
+        account = self.account
+        account2 = Account.objects.create(name = 'Test Account 2', currency = self.currency)
+        ex1 = CurrencyExchange.objects.create(
+            amount = -50,
+            description = 'Exchange USD to USD',
+            account = account,
+            date = datetime(2023, 1, 1, tzinfo=pytz.UTC),
+            type = 'from_same_currency'
+        )
+        ex2 = CurrencyExchange.objects.create(
+            amount = 50,
+            description = 'Exchange USD to USD',
+            account = account2,
+            date = datetime(2023, 1, 1, tzinfo=pytz.UTC),
+            type='to_same_currency',
+            related_transaction = ex1
+        )
+        ex1.related_transaction = ex2
+        ex1.save()
+
+        transactions = [
+            Transaction(amount=10, description="transaction 1", account=account, date=datetime(2023, 1, 1, tzinfo=pytz.UTC)),
+        ]
+
+        Transaction.objects.bulk_create(transactions) 
+
+        url = reverse('transactions-list') + '?exclude_same_currency_exchanges=true'
+        response = self.client.get(url, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.json()), 2)
+        self.assertEqual(response.json()[0]['description'], self.data['description'])
+        self.assertEqual(response.json()[1]['description'], 'transaction 1')
+
     ### CURRENCY EXCHANGES
 
     # to create a Currency exchange the endpoint should create 2 related transactions
