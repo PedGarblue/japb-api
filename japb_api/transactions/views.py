@@ -114,6 +114,22 @@ class CurrencyExchangeViewSet(viewsets.ModelViewSet):
             'description': description,
             'date': request.data['date'],
         }
+
+        # check if categories "Exchanges" and "Exchanges Income exists"
+        try:
+            category_from = Category.objects.get(name = 'Exchanges')
+            category_to = Category.objects.get(name = 'Exchanges Income')
+            category_comission = Category.objects.get(name = 'Comissions')
+        except Category.DoesNotExist:
+            category_from = None
+            category_to = None
+            category_comission = None
+        
+        if category_from:
+            from_account_transaction_data['category'] = category_from.id
+        if category_to:
+            to_account_transaction_data['category'] = category_to.id
+
         # check if the from_account and to_account are the same currency
         if account_from.currency == account_to.currency:
             from_account_transaction_data['type'] = 'from_same_currency'
@@ -158,6 +174,9 @@ class CurrencyExchangeViewSet(viewsets.ModelViewSet):
                 'exchange_from': from_account_transaction.id,
                 'exchange_to': to_account_transaction.id,
             }
+            if category_comission:
+                comission_transaction_data['category'] = category_comission.id
+
             comission_transaction_serializer = ExchangeComissionSerializer(data = comission_transaction_data)
             if comission_transaction_serializer.is_valid():
                 comission_transaction_serializer.save()

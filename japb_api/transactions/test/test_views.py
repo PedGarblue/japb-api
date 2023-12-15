@@ -376,6 +376,37 @@ class TestCurrencyTransaction(APITestCase):
         self.assertEqual(response_from.amount, -120000)
         self.assertEqual(response_to.amount, 120000)
 
+    def test_api_create_exchange_with_categories_if_available(self):
+        # delete the initial transaction
+        Transaction.objects.get().delete()
+        # if categories with name "Exchanges" and "Exchanges Income" are available, the endpoint should create the exchages with those tags
+        category_exchanges = Category.objects.create(name = 'Exchanges', color = '#000000', description = 'Exchanges')
+        category_ex_income = Category.objects.create(name = 'Exchanges Income', color = '#000000', description = 'Exchanges Income')
+        Category.objects.create(name = 'Comissions', color = '#000000', description = 'Comissions')
+        to_currency = Currency.objects.create(name = 'VES', symbol="bs")
+        from_account = self.account
+        to_account = Account.objects.create(name = 'Mercantil', currency = to_currency)
+        data_payload = {
+            'from_amount': '50.5',
+            'to_amount': 1250,
+            'from_account': from_account.id,
+            'to_account': to_account.id,
+            'desciption': 'Exchange USD to VES',
+            'date': datetime.now(tz=timezone.utc),
+        }
+        response = self.client.post(
+            reverse('exchanges-list'),
+            data_payload,
+            format = 'json'
+        )
+        self.assertEqual(CurrencyExchange.objects.count(), 2)
+        response_from = CurrencyExchange.objects.get(pk=response.json()[0]['id'])
+        response_to = CurrencyExchange.objects.get(pk=response.json()[1]['id'])
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response_from.category, category_exchanges)
+        self.assertEqual(response_to.category, category_ex_income)
+
     # should delete the 2 transactions created
     def test_api_delete_currency_exchange(self):
         # delete the initial transaction
