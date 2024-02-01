@@ -30,6 +30,7 @@ class Common(Configuration):
         'japb_api.transactions',
         'japb_api.receivables',
         'japb_api.reports',
+        'japb_api.products',
     )
 
     # https://docs.djangoproject.com/en/2.0/topics/http/middleware/
