@@ -15,19 +15,27 @@ class ProductSerializer(serializers.ModelSerializer):
             'updated_at'
         ]
 
-class ProductFilterSet(django_filters.FilterSet):
-    name = django_filters.CharFilter(lookup_expr='icontains')
-    description = django_filters.CharFilter(lookup_expr='icontains')
-    status = django_filters.CharFilter(lookup_expr='icontains')
-
+class ProductListItemSerializer(serializers.ModelSerializer):
+    total = serializers.SerializerMethodField()
+    product_name = serializers.CharField(source='product.name', read_only=True)
+    product_cost = serializers.CharField(source='product.cost', read_only=True)
     class Meta:
-        model = Product
+        model = ProductListItem
         fields = [
-            'name',
-            'description',
-            'status',
+            'id',
+            'product',
+            'product_name', # this is a read-only field
+            'product_cost', # this is a read-only field
+            'product_list',
+            'quantity',
+            'total',
+            'created_at',
+            'updated_at'
         ]
     
+    def get_total(self, product_list_item):
+        return product_list_item.quantity * product_list_item.product.cost
+
 class ProductListSerializer(serializers.ModelSerializer):
     total = serializers.SerializerMethodField()
 
@@ -50,19 +58,37 @@ class ProductListSerializer(serializers.ModelSerializer):
         # total is already in the correct format
         return total
 
-class ProductListItemSerializer(serializers.ModelSerializer):
-    total = serializers.SerializerMethodField()
+class ProductFilterSet(django_filters.FilterSet):
+    name = django_filters.CharFilter(lookup_expr='icontains')
+    description = django_filters.CharFilter(lookup_expr='icontains')
+    status = django_filters.CharFilter(lookup_expr='icontains')
+
+    class Meta:
+        model = Product
+        fields = [
+            'name',
+            'description',
+            'status',
+        ]
+
+class ProductListFilterSet(django_filters.FilterSet):
+    name = django_filters.CharFilter(lookup_expr='icontains')
+    description = django_filters.CharFilter(lookup_expr='icontains')
+
+    class Meta:
+        model = ProductList
+        fields = [
+            'name',
+            'description',
+        ]
+
+class ProductListItemFilterSet(django_filters.FilterSet):
+    product_name = django_filters.CharFilter(lookup_expr='icontains')
+    product_list = django_filters.NumberFilter()
+
     class Meta:
         model = ProductListItem
         fields = [
-            'id',
-            'product',
+            'product_name',
             'product_list',
-            'quantity',
-            'total',
-            'created_at',
-            'updated_at'
         ]
-    
-    def get_total(self, product_list_item):
-        return product_list_item.quantity * product_list_item.product.cost
