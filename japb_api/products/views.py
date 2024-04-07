@@ -18,6 +18,9 @@ class ProductsViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
     permission_classes = (AllowAny,)
+    filter_backends = (DjangoFilterBackend, filters.OrderingFilter)
+    ordering_fields = ['created_at', 'updated_at']
+    filterset_class = ProductFilterSet
 
 class ProductsListViewSet(viewsets.ModelViewSet):
     queryset = ProductList.objects.all()

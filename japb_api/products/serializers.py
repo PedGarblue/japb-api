@@ -1,6 +1,7 @@
 import django_filters
 from rest_framework import serializers
 from .models import Product, ProductList, ProductListItem
+from japb_api.transactions.models import Category
 
 class ProductSerializer(serializers.ModelSerializer):
     class Meta:
@@ -11,6 +12,7 @@ class ProductSerializer(serializers.ModelSerializer):
             'description',
             'cost',
             'status',
+            'category',
             'created_at',
             'updated_at'
         ]
@@ -62,12 +64,14 @@ class ProductFilterSet(django_filters.FilterSet):
     name = django_filters.CharFilter(lookup_expr='icontains')
     description = django_filters.CharFilter(lookup_expr='icontains')
     status = django_filters.CharFilter(lookup_expr='icontains')
+    category = django_filters.NumberFilter(field_name='category', lookup_expr='exact')
 
     class Meta:
         model = Product
         fields = [
             'name',
             'description',
+            'category',
             'status',
         ]
 

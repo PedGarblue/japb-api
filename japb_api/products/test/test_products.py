@@ -5,6 +5,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from ..models import Product
+from japb_api.transactions.models import Category
 
 class TestProducts(APITestCase):
     def setUp(self):
@@ -17,35 +18,48 @@ class TestProducts(APITestCase):
             # 'stock': 10,
             'status': 'ACTIVE',
         }
-        self.client.post(reverse('products-list'), self.data, format='json')
+        self.response_create = self.client.post(reverse('products-list'), self.data, format='json')
 
     def test_api_create_product(self):
         response = self.client.post(reverse('products-list'), self.data, format='json')
+
+        product = Product.objects.get(pk=response.data['id'])
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(Product.objects.count(), 1)
-        self.assertEqual(Product.objects.get().name, 'Test Product')
-        self.assertEqual(Product.objects.get().description, 'Test Product')
-        self.assertEqual(Product.objects.get().cost, 1300)
+        self.assertEqual(Product.objects.count(), 2) # 1 from setUp and 1 from this test
+        self.assertEqual(product.name, 'Test Product')
+        self.assertEqual(product.description, 'Test Product')
+        self.assertEqual(product.cost, 1300)
+    
+    def test_api_create_product_can_create_with_category(self):
+        category = Category.objects.create(name='Test Category', description='Test Category')
+        self.data['category'] = category.id
+        response = self.client.post(reverse('products-list'), self.data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Product.objects.count(), 2)
+        self.assertEqual(Product.objects.get(pk=response.data['id']).category.name, 'Test Category')
+        
 
     def test_api_get_a_product(self):
-        response = self.client.get(reverse('products-detail', kwargs={'pk': 1}))
+        pk = self.response_create.data['id']
+        response = self.client.get(reverse('products-detail', kwargs={'pk': pk }))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['name'], 'Test Product')
         self.assertEqual(response.data['description'], 'Test Product')
-        self.assertEqual(response.data['cost'], 1300)
+        self.assertEqual(response.data['cost'], '1300.00')
         self.assertEqual(response.data['status'], 'ACTIVE')
 
     def test_api_get_all_products(self):
         response = self.client.get(reverse('products-list'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data['results']), 1)
     
     def test_api_can_update_product(self):
-        response = self.client.put(reverse('products-detail', kwargs={'pk': 1}), self.data, format='json')
+        pk = self.response_create.data['id']
+        response = self.client.put(reverse('products-detail', kwargs={'pk': pk }), self.data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['name'], 'Test Product')
         self.assertEqual(response.data['description'], 'Test Product')
-        self.assertEqual(response.data['cost'], 1300)
+        self.assertEqual(response.data['cost'], '1300.00')
         self.assertEqual(response.data['status'], 'ACTIVE')
 
     def test_api_can_delete_product(self):
