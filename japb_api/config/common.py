@@ -24,6 +24,7 @@ class Common(Configuration):
         'corsheaders',            # Cross Origin headers 
 
         # Your apps
+        'japb_api.core',
         'japb_api.users',
         'japb_api.currencies',
         'japb_api.accounts',
@@ -194,7 +195,7 @@ class Common(Configuration):
 
     # Django Rest Framework
     REST_FRAMEWORK = {
-        'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+        'DEFAULT_PAGINATION_CLASS': 'japb_api.core.pagination.StandardResultsSetPagination',
         'PAGE_SIZE': int(os.getenv('DJANGO_PAGINATION_LIMIT', 10)),
         'DATETIME_FORMAT': '%Y-%m-%dT%H:%M:%S%z',
         'DEFAULT_RENDERER_CLASSES': (
