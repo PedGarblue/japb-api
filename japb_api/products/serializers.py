@@ -1,4 +1,5 @@
 import django_filters
+from django.db import models
 from rest_framework import serializers
 from .models import Product, ProductList, ProductListItem
 from japb_api.transactions.models import Category
@@ -18,9 +19,12 @@ class ProductSerializer(serializers.ModelSerializer):
         ]
 
 class ProductListItemSerializer(serializers.ModelSerializer):
-    total = serializers.SerializerMethodField()
+    total = serializers.IntegerField(read_only = True)
     product_name = serializers.CharField(source='product.name', read_only=True)
     product_cost = serializers.CharField(source='product.cost', read_only=True)
+    product__category = serializers.CharField(source='product.category', read_only=True)
+    product_category_color = serializers.CharField(source='product.category.color', read_only=True)
+
     class Meta:
         model = ProductListItem
         fields = [
@@ -28,15 +32,14 @@ class ProductListItemSerializer(serializers.ModelSerializer):
             'product',
             'product_name', # this is a read-only field
             'product_cost', # this is a read-only field
+            'product__category', # this is a read-only field
+            'product_category_color', # this is a read-only field
             'product_list',
             'quantity',
             'total',
             'created_at',
             'updated_at'
         ]
-    
-    def get_total(self, product_list_item):
-        return product_list_item.quantity * product_list_item.product.cost
 
 class ProductListSerializer(serializers.ModelSerializer):
     total = serializers.SerializerMethodField()
@@ -53,7 +56,12 @@ class ProductListSerializer(serializers.ModelSerializer):
         ]
     
     def get_total(self, product_list):
-        queryset = ProductListItem.objects.filter(product_list = product_list.id)
+        queryset = ProductListItem.objects.annotate(
+        total = models.ExpressionWrapper(
+            models.F('quantity') * models.F('product__cost'),
+            output_field = models.DecimalField()
+        )
+    ).filter(product_list = product_list.id)
         product_list_items = ProductListItemSerializer(queryset, many = True).data
         total = 0
         total = sum([product_list_item['total'] for product_list_item in product_list_items])
