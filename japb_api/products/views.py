@@ -20,7 +20,7 @@ class ProductsViewSet(viewsets.ModelViewSet):
     serializer_class = ProductSerializer
     permission_classes = (AllowAny,)
     filter_backends = (DjangoFilterBackend, filters.OrderingFilter)
-    ordering_fields = ['created_at', 'updated_at']
+    ordering_fields = ['category', 'cost', 'created_at', 'updated_at']
     filterset_class = ProductFilterSet
 
 class ProductsListViewSet(viewsets.ModelViewSet):
