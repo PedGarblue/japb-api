@@ -1,4 +1,5 @@
 import pytz
+from django.db import models
 from datetime import datetime
 from datetime import date
 from django.test import TestCase
@@ -8,6 +9,8 @@ from japb_api.transactions.models import Transaction
 from japb_api.transactions.factories import TransactionFactory, CurrencyExchangeFactory
 from japb_api.reports.models import ReportAccount, ReportCurrency
 from japb_api.reports.factories import ReportAccountFactory
+from japb_api.reports.serializers import ReportAccountSerializer
+
 
 class TestReportAccountModel(TestCase):
     def setUp(self):
@@ -241,13 +244,32 @@ class TestReportCurrencyModel(TestCase):
         self.assertEquals(report.total_expenses, -160)
     
     def test_can_calculate_all_fields(self):
-        ReportAccountFactory(initial_balance=6000, end_balance=7114, total_income=1164, total_expenses=-50, account=self.account1)
-        ReportAccountFactory(initial_balance=6000, end_balance=7114, total_income=1164, total_expenses=-50, account=self.account2)
-        TransactionFactory(amount=1164, account=self.account1, date=datetime(2020, 1, 1, tzinfo=pytz.UTC))
-        TransactionFactory(amount=1164, account=self.account2, date=datetime(2020, 1, 1, tzinfo=pytz.UTC))
-        TransactionFactory(amount=-50, account=self.account1, date=datetime(2020, 1, 1, tzinfo=pytz.UTC))
-        TransactionFactory(amount=-50, account=self.account2, date=datetime(2020, 1, 1, tzinfo=pytz.UTC))
+        # transactions first
+        TransactionFactory(amount=1164, account=self.account1, date=datetime(2020, 1, 2, tzinfo=pytz.UTC))
+        TransactionFactory(amount=1164, account=self.account2, date=datetime(2020, 1, 2, tzinfo=pytz.UTC))
+        TransactionFactory(amount=-50, account=self.account1, date=datetime(2020, 1, 2, tzinfo=pytz.UTC))
+        TransactionFactory(amount=-50, account=self.account2, date=datetime(2020, 1, 2, tzinfo=pytz.UTC))
 
+        ReportAccount.objects.bulk_create([
+            ReportAccount(
+                initial_balance=6000,
+                end_balance=7114,
+                total_income=1164,
+                total_expenses=-50,
+                account=self.account1,
+                from_date=date(2020, 1, 2),
+                to_date=date(2020, 1, 30)
+            ),
+            ReportAccount(
+                initial_balance=6000,
+                end_balance=7114,
+                total_income=1164,
+                total_expenses=-50,
+                account=self.account2,
+                from_date=date(2020, 1, 2),
+                to_date=date(2020, 1, 30)
+            )
+        ])
         report = ReportCurrency.objects.create(**self.data)
 
         report.calculate_initial_balance()
