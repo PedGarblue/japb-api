@@ -9,9 +9,10 @@ class TransactionFactory(DjangoModelFactory):
     class Meta:
         model = Transaction
     
-    description = 'transaction 1'
     amount = 1000
+    description = 'transaction 1'
     account = factory.SubFactory(AccountFactory)
+    category = None
     date = '2020-01-01T00:00:00Z'
     created_at = '2020-01-01T00:00:00Z'
     updated_at = '2020-01-01T00:00:00Z'

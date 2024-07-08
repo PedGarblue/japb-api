@@ -1,3 +1,4 @@
+from rest_framework_simplejwt.tokens import RefreshToken
 from django.urls import reverse
 from django.contrib.auth.hashers import check_password
 from nose.tools import ok_, eq_
@@ -14,6 +15,7 @@ fake = Faker()
 class TestUserListTestCase(APITestCase):
     """
     Tests /users list operations.
+    (only POST is allowed for this endpoint)
     """
 
     def setUp(self):
@@ -36,16 +38,32 @@ class TestUserListTestCase(APITestCase):
 class TestUserDetailTestCase(APITestCase):
     """
     Tests /users detail operations.
+    Only the owner of the user or an admin user can access this endpoint.
     """
 
     def setUp(self):
-        self.user = UserFactory()
+        self.user = UserFactory(password='69rHb9vy123c')
         self.url = reverse('user-detail', kwargs={'pk': self.user.pk})
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.user.auth_token}')
+
+        # get jwt token
+        self.token = RefreshToken.for_user(self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.token.access_token}')
+
 
     def test_get_request_returns_a_given_user(self):
         response = self.client.get(self.url)
         eq_(response.status_code, status.HTTP_200_OK)
+    
+    def test_get_request_returns_401_unauthorized_if_not_authenticated(self):
+        self.client.credentials()
+        response = self.client.get(self.url)
+        eq_(response.status_code, status.HTTP_401_UNAUTHORIZED)
+    
+    def test_get_request_returns_403_forbidden_if_not_owner(self):
+        user = UserFactory()
+        url = reverse('user-detail', kwargs={'pk': user.pk})
+        response = self.client.get(url)
+        eq_(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_put_request_updates_a_user(self):
         new_first_name = fake.first_name()
@@ -55,3 +73,16 @@ class TestUserDetailTestCase(APITestCase):
 
         user = User.objects.get(pk=self.user.id)
         eq_(user.first_name, new_first_name)
+
+    def test_put_request_returns_401_unauthorized(self):
+        self.client.credentials()
+        new_first_name = fake.first_name()
+        payload = {'first_name': new_first_name}
+        response = self.client.put(self.url, payload)
+        eq_(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_put_request_returns_403_forbidden(self):
+        user = UserFactory()
+        url = reverse('user-detail', kwargs={'pk': user.pk})
+        response = self.client.get(url)
+        eq_(response.status_code, status.HTTP_403_FORBIDDEN)

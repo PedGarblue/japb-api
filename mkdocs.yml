@@ -1,9 +1,9 @@
 site_name: japb-api
-site_description: Just Another Personal Budgeet API
+site_description: Just Another Personal Budget API
 repo_url: https://github.com/PedGarblue/japb-api
 site_dir: site
-copyright: Copyright &copy; 2020, <a href="https://github.com/PedGarblue">PedGarblue</a>.
-dev_addr: 0.0.0.0:8001
+copyright: Copyright &copy; 2024, <a href="https://github.com/PedGarblue">PedGarblue</a>.
+dev_addr: 0.0.0.0:8000
 
 nav:
   - Home: 'index.md'

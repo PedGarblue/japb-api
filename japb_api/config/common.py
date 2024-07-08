@@ -4,6 +4,7 @@ from distutils.util import strtobool
 import dj_database_url
 from configurations import Configuration
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from datetime import timedelta
 
 
 class Common(Configuration):
@@ -19,7 +20,7 @@ class Common(Configuration):
 
         # Third party apps
         'rest_framework',            # utilities for rest apis
-        'rest_framework.authtoken',  # token authentication
+        'rest_framework_simplejwt',  # jwt authentication
         'django_filters',            # for filtering rest endpoints
         'corsheaders',            # Cross Origin headers 
 
@@ -206,9 +207,16 @@ class Common(Configuration):
             'rest_framework.permissions.IsAuthenticated',
         ],
         'DEFAULT_AUTHENTICATION_CLASSES': (
-            'rest_framework.authentication.SessionAuthentication',
-            'rest_framework.authentication.TokenAuthentication',
+            'rest_framework_simplejwt.authentication.JWTAuthentication',
         )
     } 
+
+    SIMPLE_JWT = {
+        'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+        'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=1),
+        'SLIDING_TOKEN_LIFETIME': timedelta(days=30),
+        'SLIDING_TOKEN_REFRESH_LIFETIME_LATE_USER': timedelta(days=1),
+        'SLIDING_TOKEN_LIFETIME_LATE_USER': timedelta(days=30),
+    }
 
     DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
