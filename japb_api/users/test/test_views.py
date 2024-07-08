@@ -12,6 +12,33 @@ from .factories import UserFactory
 fake = Faker()
 
 
+class TestLoggedUserViewSetTestCase(APITestCase):
+    """
+    Tests /user/me and /user/update_me endpoints.
+    """
+
+    def setUp(self):
+        self.url = reverse('user-me')
+        self.user = UserFactory()
+        self.token = RefreshToken.for_user(self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.token.access_token}')
+
+    def test_get_request_returns_logged_user(self):
+        response = self.client.get(self.url)
+        eq_(response.status_code, status.HTTP_200_OK)
+        eq_(response.data.get('id'), self.user.id)
+
+    def test_patch_request_updates_logged_user(self):
+        new_first_name = fake.first_name()
+        payload = {'first_name': new_first_name}
+        response = self.client.patch(reverse('user-update-me'), payload)
+        eq_(response.status_code, status.HTTP_200_OK)
+
+        user = User.objects.get(pk=self.user.id)
+        eq_(user.first_name, new_first_name)
+
+    
+
 class TestUserListTestCase(APITestCase):
     """
     Tests /users list operations.
