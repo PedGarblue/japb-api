@@ -3,7 +3,7 @@
 [![Build Status](https://travis-ci.org/PedGarblue/japb-api.svg?branch=master)](https://travis-ci.org/PedGarblue/japb-api)
 [![Built with](https://img.shields.io/badge/Built_with-Cookiecutter_Django_Rest-F7B633.svg)](https://github.com/agconti/cookiecutter-django-rest)
 
-Just Another Personal Budgeet API. Check out the project's [documentation](http://PedGarblue.github.io/japb-api/).
+Just Another Personal Budget API.
 
 # Prerequisites
 
