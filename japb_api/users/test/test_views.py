@@ -7,7 +7,7 @@ from rest_framework import status
 from faker import Faker
 import factory
 from ..models import User
-from .factories import UserFactory
+from ..factories import UserFactory
 
 fake = Faker()
 

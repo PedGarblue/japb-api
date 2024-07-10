@@ -6,6 +6,7 @@ class Receivable(models.Model):
         ('UNPAID', 'Unpaid'),
         ('PAID', 'Paid')
     )
+    user = models.ForeignKey('users.User', null=True, on_delete=models.CASCADE)
     description = models.CharField(max_length=500)
     amount_given = models.DecimalField(max_digits=19, decimal_places = 2, default = 0)
     amount_to_receive = models.DecimalField(max_digits=19, decimal_places = 2, default = 0)

@@ -7,7 +7,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('transactions', '0010_currencyexchange_comissions'),
+        ('transactions', '0011_currencyexchange_comissions'),
         ('products', '0002_alter_product_description_and_more'),
     ]
 

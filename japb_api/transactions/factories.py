@@ -3,12 +3,14 @@ from factory.django import DjangoModelFactory
 
 from japb_api.transactions.models import Transaction, CurrencyExchange, Category
 from japb_api.accounts.factories import AccountFactory
+from japb_api.users.factories import UserFactory
 
 
 class TransactionFactory(DjangoModelFactory):
     class Meta:
         model = Transaction
     
+    user = factory.SubFactory(UserFactory)
     amount = 1000
     description = 'transaction 1'
     account = factory.SubFactory(AccountFactory)
@@ -21,6 +23,7 @@ class CurrencyExchangeFactory(DjangoModelFactory):
     class Meta:
         model = CurrencyExchange
     
+    user = factory.SubFactory(UserFactory)
     description = 'currency exchange 1'
     amount = 1000
     account = factory.SubFactory(AccountFactory)
@@ -34,6 +37,7 @@ class ExchangeComissionFactory(factory.django.DjangoModelFactory):
         model = 'transactions.ExchangeComission'
 
     id = factory.Sequence(lambda n: f'{n}')
+    user = factory.SubFactory(UserFactory)
     amount = 1000
     account = factory.Sequence(lambda n: f'{n}')
     date = factory.Faker('date_time')
@@ -47,6 +51,7 @@ class CategoryFactory(DjangoModelFactory):
     class Meta:
         model = Category
     
+    user = factory.SubFactory(UserFactory)
     name = 'test category'
     description = 'test category description'
     color = '#ffffff'

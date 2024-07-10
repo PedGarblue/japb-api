@@ -7,7 +7,7 @@ from django.db.models import F, Subquery
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('transactions', '0009_exchangecomission'),
+        ('transactions', '0010_category_user_transaction_user'),
     ]
 
     operations = [
@@ -16,6 +16,7 @@ class Migration(migrations.Migration):
                 # create comission transactions for the updated currency exchanges
                 ExchangeComission.objects.create(
                     # amount is negative and the related_transaction amount is positive
+                    user=None,
                     amount=currency_exchange.amount + currency_exchange.related_transaction.amount,
                     account=currency_exchange.account,
                     description=f'Comission for [{currency_exchange.description}]',

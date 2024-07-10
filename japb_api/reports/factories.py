@@ -4,12 +4,14 @@ from factory.django import DjangoModelFactory
 from japb_api.reports.models import ReportAccount, ReportCurrency
 from japb_api.currencies.factories import CurrencyFactory
 from japb_api.accounts.factories import AccountFactory
+from japb_api.users.factories import UserFactory
 
 
 class ReportAccountFactory(DjangoModelFactory):
     class Meta:
         model = ReportAccount
    
+    user = factory.SubFactory(UserFactory)
     from_date = '2020-01-01' 
     to_date = '2020-01-31'
     initial_balance = 200000
@@ -24,6 +26,7 @@ class ReportCurrencyFactory(DjangoModelFactory):
     class Meta:
         model = ReportCurrency
 
+    user = factory.SubFactory(UserFactory)
     from_date = '2020-01-01'
     to_date = '2020-01-31'
     initial_balance = 200000

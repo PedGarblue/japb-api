@@ -1,6 +1,8 @@
 from django.db import models
 from ..accounts.models import Account
+
 class Transaction(models.Model):
+    user = models.ForeignKey('users.User', null=True, on_delete=models.CASCADE)
     amount = models.IntegerField()
     description = models.CharField(max_length=500)
     account = models.ForeignKey(Account, on_delete=models.PROTECT)
@@ -37,6 +39,8 @@ class Category(models.Model):
         ('income', 'income'),
     ]
 
+    # some categories are global and some are user specific
+    user = models.ForeignKey('users.User', null = True, on_delete=models.CASCADE)
     name = models.CharField(max_length=50)
     color = models.CharField(max_length=50)
     description = models.CharField(max_length=500)

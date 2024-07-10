@@ -9,6 +9,7 @@ class AccountFactory(DjangoModelFactory):
     class Meta:
         model = Account
     
+    user = factory.SubFactory('japb_api.users.factories.UserFactory')
     name = 'Account 1'
     currency = factory.SubFactory(CurrencyFactory)
     decimal_places = 2

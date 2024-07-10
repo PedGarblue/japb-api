@@ -7,6 +7,7 @@ from japb_api.accounts.models import Account
 from japb_api.transactions.models import Transaction, CurrencyExchange
 
 class Report(models.Model):
+    user = models.ForeignKey('users.User', null=True, on_delete=models.CASCADE)
     from_date = models.DateField()
     to_date = models.DateField()
     # balances are stored as integers just like transactions
