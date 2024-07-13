@@ -8,6 +8,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from ..models import Transaction, CurrencyExchange, ExchangeComission, Category
 from ..factories import TransactionFactory, CategoryFactory, CurrencyExchangeFactory
+from japb_api.users.factories import UserFactory
 from japb_api.users.models import User
 from japb_api.accounts.models import Account
 from japb_api.currencies.models import Currency
@@ -551,45 +552,33 @@ class TestCategories(APITestCase):
             username = self.fake.user_name(),
             password = self.fake.password(),
         )
-        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {RefreshToken.for_user(self.user).access_token}')
         self.currency = Currency.objects.create(name = 'USD')
         self.account = Account.objects.create(name = 'Test Account', currency = self.currency)
         self.data = {
-            'amount': -50,
-            'description': 'Purchase',
-            'account': self.account.id,
-            'type': 'expense',
-            'date': datetime.now(tz=timezone.utc),
-        }
-        self.response = self.client.post(
-            reverse('transactions-list'),
-            self.data,
-            format = 'json'
-        )
-
-    def test_api_create_category(self):
-        data = {
             'name': 'Food',
             'description': 'Food expenses',
             'color': '#000000',
             'type': 'expense',
-            'user': self.user.id,
         }
-        response = self.client.post(
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {RefreshToken.for_user(self.user).access_token}')
+        self.response = self.client.post(
             reverse('categories-list'),
-            data,
+            self.data,
             format = 'json'
         )
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.json()[0]['name'], 'Food')
-        self.assertEqual(response.json()[0]['description'], 'Food expenses')
-        self.assertEqual(response.json()[0]['color'], '#000000')
-        self.assertEqual(response.json()[0]['parent_category'], None)
-        self.assertEqual(response.json()[0]['type'], 'expense')
-        self.assertEqual(response.json()[0]['user'], f'{self.user.id}')
-        self.assertEqual(Category.objects.count(), 1)
 
-    def test_api_create_category_unauthorized(self):
+    def test_api_create_user_category(self):
+        self.assertEqual(self.response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(self.response.json()[0]['name'], 'Food')
+        self.assertEqual(self.response.json()[0]['description'], 'Food expenses')
+        self.assertEqual(self.response.json()[0]['color'], '#000000')
+        self.assertEqual(self.response.json()[0]['parent_category'], None)
+        self.assertEqual(self.response.json()[0]['type'], 'expense')
+        category = Category.objects.get()
+        self.assertEqual(Category.objects.count(), 1)
+        self.assertEqual(category.user, self.user)
+
+    def test_api_user_create_category_unauthorized(self):
         data = {
             'name': 'Food',
             'description': 'Food expenses',
@@ -636,19 +625,13 @@ class TestCategories(APITestCase):
         self.assertEqual(response.json()[0]['type'], 'expense')
 
     def test_get_categories(self):
-        data = {
-            'name': 'Food',
-            'description': 'Food expenses',
-            'color': '#000000',
-            'type': 'expense',
-        }
-        response = self.client.post(
-            reverse('categories-list'),
-            data,
-            format = 'json'
-        )
+        """"Should return global and user categories"""
+        # global category
+        CategoryFactory(user = None)
+        
         response = self.client.get(reverse('categories-list'), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.json()), 2)
         self.assertEqual(response.json()[0]['name'], 'Food')
         self.assertEqual(response.json()[0]['description'], 'Food expenses')
         self.assertEqual(response.json()[0]['color'], '#000000')
@@ -688,7 +671,7 @@ class TestCategories(APITestCase):
         self.assertEqual(response.json()['type'], 'expense')
 
     def test_api_update_category_forbidden_global_category(self):
-        global_category = CategoryFactory()
+        global_category = CategoryFactory(user = None)
 
         user = User.objects.create_user(
             email = self.fake.email(),
@@ -715,3 +698,60 @@ class TestCategories(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_api_update_category_forbidden_other_user_category(self):
+        user = User.objects.create_user(
+            email = self.fake.email(),
+            username = self.fake.user_name(),
+            password = self.fake.password(),
+        )
+
+        token = RefreshToken.for_user(user)
+
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token.access_token}')
+
+        data = {
+            'name': 'Groceries',
+            'description': 'Groceries expenses',
+            'color': '#000000',
+            'type': 'expense',
+        }
+
+        category = CategoryFactory(user=self.user)
+
+        response = self.client.put(
+            reverse('categories-detail', kwargs={ 'pk': category.id }),
+            data,
+            format = 'json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_api_cant_delete_global_category(self):
+        global_category = CategoryFactory(user=None)
+
+        response = self.client.delete(
+            reverse('categories-detail', kwargs={ 'pk': global_category.id }),
+            format = 'json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_api_cant_delete_other_user_category(self):
+        category = CategoryFactory(user=self.user)
+
+        user = User.objects.create_user(
+            email = self.fake.email(),
+            username = self.fake.user_name(),
+            password = self.fake.password(),
+        )
+
+        token = RefreshToken.for_user(user)
+
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token.access_token}')
+
+        response = self.client.delete(
+            reverse('categories-detail', kwargs={ 'pk': category.id }),
+            format = 'json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

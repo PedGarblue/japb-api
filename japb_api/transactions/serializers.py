@@ -77,15 +77,14 @@ class CategorySerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         ]
-        hidden_fields = [
-            'user',
-        ]
 
         read_only_fields = [
             'id',
             'created_at',
             'updated_at',
         ]
+
+    user = serializers.HiddenField(default=serializers.CurrentUserDefault())
 
 class TransactionFilterSet(django_filters.FilterSet):
     start_date = django_filters.DateTimeFilter(field_name='date', lookup_expr='gte')

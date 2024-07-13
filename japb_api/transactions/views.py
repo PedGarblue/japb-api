@@ -1,10 +1,12 @@
+from django.db.models import Q
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets, filters
 from rest_framework import serializers
 from rest_framework.decorators import api_view, action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework_simplejwt.authentication import JWTAuthentication
+
 
 from ..accounts.models import Account
 from .permissions import IsOwnerOrReadOnly, IsOwner
@@ -198,12 +200,15 @@ class CurrencyExchangeViewSet(viewsets.ModelViewSet):
         return Response(response, status = status.HTTP_201_CREATED) 
     
 class CategoryViewSet(viewsets.ModelViewSet):
-    user = serializers.PrimaryKeyRelatedField(read_only=True, default=serializers.CurrentUserDefault())
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     filter_backends = (DjangoFilterBackend, filters.OrderingFilter)
     ordering_fields = ['name']
     permission_classes = (IsAuthenticated, IsOwnerOrReadOnly,)
+
+    def get_queryset(self):
+        """ get global categories and user categories """
+        return Category.objects.filter(Q(user=self.request.user.id) | Q(user__isnull=True))
 
     def create(self, request):
         categories_data = request.data
