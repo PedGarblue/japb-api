@@ -4,15 +4,24 @@ from datetime import datetime, timezone
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from ..models import Transaction, CurrencyExchange, ExchangeComission, Category
-from .factories import TransactionFactory
+from ..factories import TransactionFactory, CategoryFactory, CurrencyExchangeFactory
+from japb_api.users.models import User
 from japb_api.accounts.models import Account
 from japb_api.currencies.models import Currency
 
 class TestCurrencyTransaction(APITestCase):
     def setUp(self):
         self.fake = Faker(['en-US'])
+        self.user = User.objects.create_user(
+            email = self.fake.email(),
+            username = self.fake.user_name(),
+            password = self.fake.password(),
+        )
+        self.token = RefreshToken.for_user(self.user)
+
         self.currency = Currency.objects.create(name = 'USD')
         self.account = Account.objects.create(name = 'Test Account', currency = self.currency)
         self.category = Category.objects.create(name = 'Food', color = '#000000', description = 'Food expenses')
@@ -38,6 +47,8 @@ class TestCurrencyTransaction(APITestCase):
             'category': self.category.id
         }
 
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.token.access_token}')
+
         self.response = self.client.post(
             reverse('transactions-list'),
             self.data,
@@ -51,6 +62,16 @@ class TestCurrencyTransaction(APITestCase):
         self.assertEqual(transaction.description, 'Purchase')
         self.assertEqual(transaction.category, self.category)
         self.assertEqual(transaction.amount, -5000)
+        self.assertEqual(transaction.user, self.user)
+    
+    def test_api_create_transaction_unauthorized(self):
+        self.client.credentials(HTTP_AUTHORIZATION=None)
+        response = self.client.post(
+            reverse('transactions-list'),
+            self.data,
+            format = 'json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_api_create_transaction_handles_decimal_places(self):
         Transaction.objects.all().delete()
@@ -87,16 +108,19 @@ class TestCurrencyTransaction(APITestCase):
         # 3 + the one created at setUp()
         self.assertEqual(Transaction.objects.count(), 4)
     
-    def test_api_get_transactions(self):
+    def test_api_get_user_transactions(self):
+        # non user transaction
+        TransactionFactory()
         url = reverse('transactions-list')
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(Transaction.objects.count(), 1)
+        # only one transaction created by the user
+        self.assertEqual(len(response.json()), 1)
         # amount
         self.assertEquals(response.json()[0]['amount'], '-50.00')
         self.assertEquals(response.json()[0]['category'], self.category.id)
 
-    def test_api_get_a_transaction(self):
+    def test_api_get_a_user_transaction(self):
         transaction = Transaction.objects.get()
         response = self.client.get(reverse('transactions-detail', kwargs={ 'pk': transaction.id }), format='json')
 
@@ -125,19 +149,54 @@ class TestCurrencyTransaction(APITestCase):
         self.assertEqual(updated_transaction.description, "New transaction")
         self.assertEqual(updated_transaction.amount, -500)
 
+    def test_api_update_transaction_unauthorized(self):
+        transaction = Transaction.objects.get()
+        new_data = {
+            'description': 'New transaction',
+            'amount': -5,
+            'account': self.account.id,
+            'date': datetime.now(tz=timezone.utc),
+        }
+        self.client.credentials(HTTP_AUTHORIZATION=None)
+        response = self.client.put(reverse('transactions-detail', kwargs={ 'pk': transaction.id }), data=new_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+    
+    def test_api_cannot_update_non_same_user_transaction(self):
+        transaction = Transaction.objects.get()
+        user = User.objects.create_user(
+            email = self.fake.email(),
+            username = self.fake.user_name(),
+            password = self.fake.password(),
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {RefreshToken.for_user(user).access_token}')
+        new_data = {
+            'description': 'New transaction',
+            'amount': -5,
+            'account': self.account.id,
+            'date': datetime.now(tz=timezone.utc),
+        }
+        response = self.client.put(reverse('transactions-detail', kwargs={ 'pk': transaction.id }), data=new_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
     def test_api_can_delete_a_transaction(self):
         transaction = Transaction.objects.get()
         response = self.client.delete(reverse('transactions-detail', kwargs={ 'pk': transaction.id }), format='json')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(Transaction.objects.count(), 0)
 
+    def test_api_delete_transaction_unauthorized(self):
+        transaction = Transaction.objects.get()
+        self.client.credentials(HTTP_AUTHORIZATION=None)
+        response = self.client.delete(reverse('transactions-detail', kwargs={ 'pk': transaction.id }), format='json')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
     def test_api_get_transaction_by_custom_date(self):
         # add transacions to the account
         account = self.account
         transactions = [
-            Transaction(amount=10, description="transaction 1", account=account, date=datetime(2023, 1, 1, tzinfo=pytz.UTC)),
-            Transaction(amount=30, description="transaction 2", account=account, date=datetime(2023, 3, 1, tzinfo=pytz.UTC)),
-            Transaction(amount=25, description="transaction 3", account=account, date=datetime(2023, 3, 1, tzinfo=pytz.UTC))
+            Transaction(amount=10, description="transaction 1", account=account, date=datetime(2023, 1, 1, tzinfo=pytz.UTC), user = self.user),
+            Transaction(amount=30, description="transaction 2", account=account, date=datetime(2023, 3, 1, tzinfo=pytz.UTC), user = self.user),
+            Transaction(amount=25, description="transaction 3", account=account, date=datetime(2023, 3, 1, tzinfo=pytz.UTC), user = self.user)
         ]
         Transaction.objects.bulk_create(transactions) 
 
@@ -147,16 +206,16 @@ class TestCurrencyTransaction(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(Transaction.objects.count(), 4)
         self.assertEqual(len(response.json()), 2)
-        self.assertEqual(response.json()[0]['description'], 'transaction 2')
-        self.assertEqual(response.json()[1]['description'], 'transaction 3')
+        self.assertEqual(response.json()[1]['description'], 'transaction 2')
+        self.assertEqual(response.json()[0]['description'], 'transaction 3')
     
     def test_api_get_transaction_by_datetime(self):
         # add transacions to the account
         account = self.account
         transactions = [
-            Transaction(amount=10, description="transaction 1", account=account, date=datetime(2023, 1, 1, tzinfo=pytz.UTC)),
-            Transaction(amount=30, description="transaction 2", account=account, date=datetime(2023, 3, 1, tzinfo=pytz.UTC)),
-            Transaction(amount=25, description="transaction 3", account=account, date=datetime(2023, 3, 1, tzinfo=pytz.UTC))
+            Transaction(amount=10, description="transaction 1", account=account, date=datetime(2023, 1, 1, tzinfo=pytz.UTC), user = self.user),
+            Transaction(amount=30, description="transaction 2", account=account, date=datetime(2023, 3, 1, tzinfo=pytz.UTC), user = self.user),
+            Transaction(amount=25, description="transaction 3", account=account, date=datetime(2023, 3, 1, tzinfo=pytz.UTC), user = self.user)
         ]
         Transaction.objects.bulk_create(transactions) 
 
@@ -166,17 +225,17 @@ class TestCurrencyTransaction(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(Transaction.objects.count(), 4)
         self.assertEqual(len(response.json()), 2)
-        self.assertEqual(response.json()[0]['description'], 'transaction 2')
-        self.assertEqual(response.json()[1]['description'], 'transaction 3')
+        self.assertEqual(response.json()[1]['description'], 'transaction 2')
+        self.assertEqual(response.json()[0]['description'], 'transaction 3')
 
     def test_api_get_transaction_by_account(self):
         # add transacions to the account
         account = self.account
         account2 = Account.objects.create(name = 'Test Account 2', currency = self.currency)
         transactions = [
-            Transaction(amount=10, description="transaction 1", account=account, date=datetime(2023, 1, 1, tzinfo=pytz.UTC)),
-            Transaction(amount=30, description="transaction 2", account=account, date=datetime(2023, 3, 1, tzinfo=pytz.UTC)),
-            Transaction(amount=25, description="transaction 3", account=account2, date=datetime(2023, 3, 1, tzinfo=pytz.UTC))
+            Transaction(amount=10, description="transaction 1", account=account, date=datetime(2023, 1, 1, tzinfo=pytz.UTC), user = self.user),
+            Transaction(amount=30, description="transaction 2", account=account, date=datetime(2023, 3, 1, tzinfo=pytz.UTC), user = self.user),
+            Transaction(amount=25, description="transaction 3", account=account2, date=datetime(2023, 3, 1, tzinfo=pytz.UTC), user = self.user)
         ]
         Transaction.objects.bulk_create(transactions) 
 
@@ -196,10 +255,10 @@ class TestCurrencyTransaction(APITestCase):
         nonSelectedCurrency = Currency.objects.create(name = 'EUR')
         account2 = Account.objects.create(name = 'Test Account 2', currency = nonSelectedCurrency)
         transactions = [
-            Transaction(amount=10, description="transaction 1", account=selectedAccount, date=datetime(2023, 1, 1, tzinfo=pytz.UTC)),
-            Transaction(amount=30, description="transaction 2", account=selectedAccount, date=datetime(2023, 3, 1, tzinfo=pytz.UTC)),
-            Transaction(amount=40, description="transaction 3", account=selectedAccount, date=datetime(2023, 3, 1, tzinfo=pytz.UTC)),
-            Transaction(amount=25, description="transaction 4", account=account2, date=datetime(2023, 3, 1, tzinfo=pytz.UTC))
+            Transaction(amount=10, description="transaction 1", account=selectedAccount, date=datetime(2023, 1, 1, tzinfo=pytz.UTC), user = self.user),
+            Transaction(amount=30, description="transaction 2", account=selectedAccount, date=datetime(2023, 3, 1, tzinfo=pytz.UTC), user = self.user),
+            Transaction(amount=40, description="transaction 3", account=selectedAccount, date=datetime(2023, 3, 1, tzinfo=pytz.UTC), user = self.user),
+            Transaction(amount=25, description="transaction 4", account=account2, date=datetime(2023, 3, 1, tzinfo=pytz.UTC), user = self.user)
         ]
         Transaction.objects.bulk_create(transactions) 
 
@@ -221,7 +280,8 @@ class TestCurrencyTransaction(APITestCase):
             description = 'Exchange USD to USD',
             account = account,
             date = datetime(2023, 1, 1, tzinfo=pytz.UTC),
-            type = 'from_same_currency'
+            type = 'from_same_currency',
+            user = self.user
         )
         ex2 = CurrencyExchange.objects.create(
             amount = 50,
@@ -229,13 +289,14 @@ class TestCurrencyTransaction(APITestCase):
             account = account2,
             date = datetime(2023, 1, 1, tzinfo=pytz.UTC),
             type='to_same_currency',
-            related_transaction = ex1
+            related_transaction = ex1,
+            user = self.user
         )
         ex1.related_transaction = ex2
         ex1.save()
 
         transactions = [
-            Transaction(amount=10, description="transaction 1", account=account, date=datetime(2023, 1, 1, tzinfo=pytz.UTC)),
+            Transaction(amount=10, description="transaction 1", account=account, date=datetime(2023, 1, 1, tzinfo=pytz.UTC), user = self.user),
         ]
 
         Transaction.objects.bulk_create(transactions) 
@@ -245,8 +306,8 @@ class TestCurrencyTransaction(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.json()), 2)
-        self.assertEqual(response.json()[0]['description'], self.data['description'])
-        self.assertEqual(response.json()[1]['description'], 'transaction 1')
+        self.assertEqual(response.json()[1]['description'], self.data['description'])
+        self.assertEqual(response.json()[0]['description'], 'transaction 1')
 
     ### CURRENCY EXCHANGES
 
@@ -291,6 +352,28 @@ class TestCurrencyTransaction(APITestCase):
         # created with correct types
         self.assertEqual(response_from.type, 'from_different_currency')
         self.assertEqual(response_to.type, 'to_different_currency')
+
+    def test_api_create_currency_exchange_unauthorized(self):
+        # delete the initial transaction
+        Transaction.objects.get().delete()
+        to_currency = Currency.objects.create(name = 'VES', symbol="bs")
+        from_account = self.account
+        to_account = Account.objects.create(name = 'Mercantil', currency = to_currency)
+        data_payload = {
+            'from_amount': '50.50',
+            'to_amount': 1250,
+            'description': 'Exchange USD to VES',
+            'from_account': from_account.id,
+            'to_account': to_account.id,
+            'date': datetime.now(tz=timezone.utc),
+        }
+        self.client.credentials(HTTP_AUTHORIZATION=None)
+        response = self.client.post(
+            reverse('exchanges-list'),
+            data_payload,
+            format = 'json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_api_create_transaction_with_default_description(self):
         # the default description should be "Exchange from {from_account_name} to {to_account_name}"
@@ -433,10 +516,42 @@ class TestCurrencyTransaction(APITestCase):
         response_delete = self.client.delete(reverse('transactions-detail', kwargs={ 'pk': transaction['id'] }), format='json')
         self.assertEqual(response_delete.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(CurrencyExchange.objects.count(), 0)
+
+    def test_api_delete_currency_exchange_unauthorized(self):
+        # delete the initial transaction
+        from_account = self.account
+        to_currency = Currency.objects.create(name = 'VES')
+        to_account = Account.objects.create(name = 'Mercantil', currency = to_currency)
+        data_payload = {
+            'from_amount': -50,
+            'to_amount': 1250,
+            'description': 'Exchange USD to VES',
+            'from_account': from_account.id,
+            'to_account': to_account.id,
+            'date': datetime.now(),
+        }
+        # i'm too lazy to create 2 exchange transactions with the model, use the endpoint lol
+        response_exchanges = self.client.post(
+            reverse('exchanges-list'),
+            data_payload,
+            format = 'json'
+        )
+
+        transaction = response_exchanges.json()[0]
+
+        self.client.credentials(HTTP_AUTHORIZATION=None)
+        response_delete = self.client.delete(reverse('transactions-detail', kwargs={ 'pk': transaction['id'] }), format='json')
+        self.assertEqual(response_delete.status_code, status.HTTP_401_UNAUTHORIZED)
         
 class TestCategories(APITestCase):
     def setUp(self):
         self.fake = Faker(['en-US'])
+        self.user = User.objects.create_user(
+            email = self.fake.email(),
+            username = self.fake.user_name(),
+            password = self.fake.password(),
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {RefreshToken.for_user(self.user).access_token}')
         self.currency = Currency.objects.create(name = 'USD')
         self.account = Account.objects.create(name = 'Test Account', currency = self.currency)
         self.data = {
@@ -458,6 +573,7 @@ class TestCategories(APITestCase):
             'description': 'Food expenses',
             'color': '#000000',
             'type': 'expense',
+            'user': self.user.id,
         }
         response = self.client.post(
             reverse('categories-list'),
@@ -470,6 +586,23 @@ class TestCategories(APITestCase):
         self.assertEqual(response.json()[0]['color'], '#000000')
         self.assertEqual(response.json()[0]['parent_category'], None)
         self.assertEqual(response.json()[0]['type'], 'expense')
+        self.assertEqual(response.json()[0]['user'], f'{self.user.id}')
+        self.assertEqual(Category.objects.count(), 1)
+
+    def test_api_create_category_unauthorized(self):
+        data = {
+            'name': 'Food',
+            'description': 'Food expenses',
+            'color': '#000000',
+            'type': 'expense',
+        }
+        self.client.credentials(HTTP_AUTHORIZATION=None)
+        response = self.client.post(
+            reverse('categories-list'),
+            data,
+            format = 'json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_api_create_category_with_parent(self):
         parent = {
@@ -521,3 +654,64 @@ class TestCategories(APITestCase):
         self.assertEqual(response.json()[0]['color'], '#000000')
         self.assertEqual(response.json()[0]['parent_category'], None)
         self.assertEqual(response.json()[0]['type'], 'expense')
+    
+    def test_api_update_category(self):
+        data = {
+            'name': 'Food',
+            'description': 'Food expenses',
+            'color': '#000000',
+            'type': 'expense',
+            'user': self.user.id,
+        }
+        response = self.client.post(
+            reverse('categories-list'),
+            data,
+            format = 'json'
+        )
+        category = response.json()[0]
+        data = {
+            'name': 'Groceries',
+            'description': 'Groceries expenses',
+            'color': '#000000',
+            'type': 'expense',
+        }
+        response = self.client.put(
+            reverse('categories-detail', kwargs={ 'pk': category['id'] }),
+            data,
+            format = 'json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['name'], 'Groceries')
+        self.assertEqual(response.json()['description'], 'Groceries expenses')
+        self.assertEqual(response.json()['color'], '#000000')
+        self.assertEqual(response.json()['parent_category'], None)
+        self.assertEqual(response.json()['type'], 'expense')
+
+    def test_api_update_category_forbidden_global_category(self):
+        global_category = CategoryFactory()
+
+        user = User.objects.create_user(
+            email = self.fake.email(),
+            username = self.fake.user_name(),
+            password = self.fake.password(),
+        )
+
+        token = RefreshToken.for_user(user)
+
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token.access_token}')
+
+        data = {
+            'name': 'Groceries',
+            'description': 'Groceries expenses',
+            'color': '#000000',
+            'type': 'expense',
+        }
+
+        response = self.client.put(
+            reverse('categories-detail', kwargs={ 'pk': global_category.id }),
+            data,
+            format = 'json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+

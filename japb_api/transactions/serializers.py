@@ -5,9 +5,11 @@ from .models import Transaction, CurrencyExchange, ExchangeComission, Category
 from japb_api.accounts.models import Account
 
 class TransactionSerializer(serializers.ModelSerializer):
+    user = serializers.HiddenField(default=serializers.CurrentUserDefault())
     class Meta:
         model = Transaction
-        fields = ['id', 'amount', 'description', 'account', 'category', 'date']
+        fields = ['id','user', 'amount', 'description', 'account', 'category', 'date',]
+        read_only_fields = ['id']
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
@@ -16,10 +18,12 @@ class TransactionSerializer(serializers.ModelSerializer):
         return rep
 
 class CurrencyExchangeSerializer(serializers.ModelSerializer):
+    user = serializers.HiddenField(default=serializers.CurrentUserDefault())
     class Meta:
         model = CurrencyExchange
         fields = [
             'id',
+            'user',
             'amount',
             'description',
             'account',
@@ -28,6 +32,7 @@ class CurrencyExchangeSerializer(serializers.ModelSerializer):
             'related_transaction',
             'type',
         ]
+        read_only_fields = ['id']
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
@@ -49,6 +54,8 @@ class ExchangeComissionSerializer(serializers.ModelSerializer):
             'exchange_to',
             'type',
         ]
+        read_only_fields = ['id']
+
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
@@ -61,6 +68,7 @@ class CategorySerializer(serializers.ModelSerializer):
         model = Category
         fields = [
             'id',
+            'user',
             'name',
             'color',
             'description',
@@ -68,6 +76,9 @@ class CategorySerializer(serializers.ModelSerializer):
             'type',
             'created_at',
             'updated_at',
+        ]
+        hidden_fields = [
+            'user',
         ]
 
         read_only_fields = [

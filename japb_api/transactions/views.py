@@ -1,9 +1,13 @@
 from rest_framework import status, viewsets, filters
+from rest_framework import serializers
 from rest_framework.decorators import api_view, action
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework_simplejwt.authentication import JWTAuthentication
+
 from ..accounts.models import Account
+from .permissions import IsOwnerOrReadOnly, IsOwner
 from .models import Transaction, CurrencyExchange, Category
 from .serializers import \
     TransactionSerializer,\
@@ -22,7 +26,10 @@ class TransactionViewSet(viewsets.ModelViewSet):
     filter_backends = (DjangoFilterBackend, filters.OrderingFilter)
     filterset_class = TransactionFilterSet
     ordering_fields = ['date']
-    permission_classes = (AllowAny,)
+    permission_classes = (IsAuthenticated, IsOwner,)
+
+    def get_queryset(self):
+        return Transaction.objects.filter(user=self.request.user)
 
     def list(self, request):
         qs = self.filter_queryset(self.get_queryset())
@@ -57,11 +64,11 @@ class TransactionViewSet(viewsets.ModelViewSet):
     
     def update(self, request, pk = None):
         try:
-            transaction = Transaction.objects.get(pk = pk)
+            transaction = self.get_queryset().get(pk=pk)
         except Transaction.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
-        serializer = TransactionSerializer(transaction, data=request.data)
+        serializer = self.get_serializer(transaction, data=request.data, partial=True)
 
         amount = float(serializer.initial_data.get('amount'))
         decimal_places = Account.objects.get(pk=serializer.initial_data.get('account')).decimal_places
@@ -76,12 +83,16 @@ class TransactionViewSet(viewsets.ModelViewSet):
         return super().destroy(request, *args, **kwargs)
     
 class CurrencyExchangeViewSet(viewsets.ModelViewSet):
+    user = serializers.PrimaryKeyRelatedField(read_only=True, default=serializers.CurrentUserDefault())
     queryset = CurrencyExchange.objects.all()
     serializer_class = CurrencyExchangeSerializer
     filter_backends = (DjangoFilterBackend, filters.OrderingFilter)
     filterset_class = TransactionFilterSet
     ordering_fields = ['date']
-    permission_classes = (AllowAny,)
+    permission_classes = (IsAuthenticated, IsOwner,)
+
+    def get_queryset(self):
+        return CurrencyExchange.objects.filter(user=self.request.user)
 
     def create(self, request):
         try:
@@ -187,11 +198,12 @@ class CurrencyExchangeViewSet(viewsets.ModelViewSet):
         return Response(response, status = status.HTTP_201_CREATED) 
     
 class CategoryViewSet(viewsets.ModelViewSet):
+    user = serializers.PrimaryKeyRelatedField(read_only=True, default=serializers.CurrentUserDefault())
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     filter_backends = (DjangoFilterBackend, filters.OrderingFilter)
     ordering_fields = ['name']
-    permission_classes = (AllowAny,)
+    permission_classes = (IsAuthenticated, IsOwnerOrReadOnly,)
 
     def create(self, request):
         categories_data = request.data
@@ -217,21 +229,6 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
-
-    def update(self, request, pk = None):
-        try:
-            category = Category.objects.get(pk = pk)
-        except Category.DoesNotExist:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-
-        serializer = CategorySerializer(category, data=request.data)
-
-        if serializer.is_valid():
-            category = serializer.save()
-            return Response(serializer.data)
-        else:
-            return Response(serializer.errors,
-                            status=status.HTTP_400_BAD_REQUEST)
     
     def destroy(self, request, *args, **kwargs):
         return super().destroy(request, *args, **kwargs)
