@@ -12,7 +12,7 @@ class CurrencySerializer(serializers.ModelSerializer):
         read_only_field = ['id', 'created_at', 'balance']
     
     def get_balance(self, currency):
-        queryset = Account.objects.filter(currency = currency.id)
+        queryset = Account.objects.filter(currency = currency.id, user = self.context['request'].user)
         accounts = AccountSerializer(queryset, many = True).data
         balance_sum = 0
         balance_sum = sum([float(account['balance']) for account in accounts])
