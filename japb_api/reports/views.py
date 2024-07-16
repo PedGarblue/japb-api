@@ -4,16 +4,20 @@ from .serializers import ReportAccountSerializer, ReportCurrencySerializer, Repo
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import status, viewsets, filters
 
+from japb_api.core.permissions import IsOwner
+
 class ReportAccountViewSet(viewsets.ModelViewSet):
-    queryset = ReportAccount.objects.all()
     serializer_class = ReportAccountSerializer
     filter_backends = (DjangoFilterBackend, filters.OrderingFilter)
     filterset_class = ReportAccountFilterSet
     ordering_fields = ['from_date']
-    permission_classes = (AllowAny,)
+    permission_classes = (IsAuthenticated, IsOwner,)
+
+    def get_queryset(self):
+        return ReportAccount.objects.filter(user=self.request.user)
 
     def create(self, request):
         reports_data = request.data
@@ -50,11 +54,11 @@ class ReportAccountViewSet(viewsets.ModelViewSet):
 
     def update(self, request, pk = None):
         try:
-            report = ReportAccount.objects.get(pk = pk)
+            report = self.get_queryset().get(pk = pk)
         except ReportAccount.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
-        serializer = ReportAccountSerializer(report, data=request.data)
+        serializer = self.get_serializer(report, data=request.data)
 
         if serializer.is_valid():
             # calculate initial balance
@@ -75,12 +79,14 @@ class ReportAccountViewSet(viewsets.ModelViewSet):
         return super().destroy(request, *args, **kwargs)
 
 class ReportCurrencyViewSet(viewsets.ModelViewSet):
-    queryset = ReportCurrency.objects.all()
     serializer_class = ReportCurrencySerializer
     filter_backends = (DjangoFilterBackend, filters.OrderingFilter)
     filterset_class = ReportCurrencyFilterSet
     ordering_fields = ['from_date']
-    permission_classes = (AllowAny,)
+    permission_classes = (IsAuthenticated, IsOwner,)
+
+    def get_queryset(self):
+        return ReportCurrency.objects.filter(user=self.request.user)
 
     def create(self, request):
         reports_data = request.data
@@ -109,7 +115,7 @@ class ReportCurrencyViewSet(viewsets.ModelViewSet):
 
     def list(self, request):
         reports = self.filter_queryset(self.get_queryset())
-        serializer = ReportCurrencySerializer(reports, many=True)
+        serializer = self.get_serializer(reports, many=True)
         return Response(serializer.data)
 
     def retrieve(self, request, *args, **kwargs):
@@ -117,11 +123,11 @@ class ReportCurrencyViewSet(viewsets.ModelViewSet):
 
     def update(self, request, pk = None):
         try:
-            report = ReportCurrency.objects.get(pk = pk)
+            report = self.get_queryset().get(pk = pk)
         except ReportCurrency.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
-        serializer = ReportCurrencySerializer(report, data=request.data)
+        serializer = self.get_serializer(report, data=request.data)
 
         if serializer.is_valid():
             # calculate initial balance

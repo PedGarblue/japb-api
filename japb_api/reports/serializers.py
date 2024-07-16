@@ -6,10 +6,12 @@ from japb_api.currencies.models import Currency
 
 class ReportAccountSerializer(serializers.ModelSerializer):
     balance_status = serializers.SerializerMethodField()
+    user = serializers.HiddenField(default=serializers.CurrentUserDefault())
     class Meta:
         model = ReportAccount
         fields = [
             'id',
+            'user',
             'from_date',
             'to_date',
             'initial_balance',
@@ -55,11 +57,13 @@ class ReportAccountSerializer(serializers.ModelSerializer):
         return rep
     
 class ReportCurrencySerializer(serializers.ModelSerializer):
+    user = serializers.HiddenField(default=serializers.CurrentUserDefault())
     balance_status = serializers.SerializerMethodField()
     class Meta:
         model = ReportCurrency
         fields = [
             'id',
+            'user',
             'from_date',
             'to_date',
             'initial_balance',

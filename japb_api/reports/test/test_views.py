@@ -5,8 +5,10 @@ from faker import Faker
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from ..models import ReportAccount, ReportCurrency
+from japb_api.users.factories import UserFactory
 from japb_api.accounts.models import Account
 from japb_api.currencies.models import Currency
 from japb_api.transactions.models import Transaction
@@ -18,7 +20,11 @@ class TestReportAccountViews(APITestCase):
     def setUp(self):
         self.fake = Faker(['en-US'])
         self.currency = Currency.objects.create(name='Test Currency', symbol='T')
-        self.account = Account.objects.create(name='Test Account', currency=self.currency)
+        self.user = UserFactory()
+        self.token = RefreshToken.for_user(self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.token.access_token}')
+
+        self.account = Account.objects.create(name='Test Account', currency=self.currency, user = self.user)
         self.data = {
             'from_date': date(2023, 1, 1),
             'to_date': date(2023, 1, 31),
@@ -27,6 +33,7 @@ class TestReportAccountViews(APITestCase):
         self.transactions = [
             # initial balance transaction
             Transaction(
+                user = self.user,
                 amount= 6000,
                 description="transaction initial balance",
                 account=self.account,
@@ -34,12 +41,14 @@ class TestReportAccountViews(APITestCase):
             ),
             # income transactions
             Transaction(
+                user = self.user,
                 amount=1064,
                 description="transaction income 1",
                 account=self.account,
                 date=datetime(2023, 1, 1, tzinfo=pytz.UTC)
             ),
             Transaction(
+                user = self.user,
                 amount=3046,
                 description="transaction income 2",
                 account=self.account,
@@ -47,6 +56,7 @@ class TestReportAccountViews(APITestCase):
             ),
             # expense transactions
             Transaction(
+                user = self.user,
                 amount=-4100,
                 description="transaction expense 3",
                 account=self.account,
@@ -67,6 +77,7 @@ class TestReportAccountViews(APITestCase):
         self.assertEqual(db_report.total_income, 0)
         self.assertEqual(db_report.total_expenses, 0)
         self.assertEqual(db_report.account.id, self.account.id)
+        self.assertEqual(f'{db_report.user.id}', self.user.id)
 
     def test_api_create_report_invalid_data(self):
         self.data['from_date'] = 'invalid'
@@ -112,8 +123,9 @@ class TestReportAccountViews(APITestCase):
         self.assertEqual(json_data[0]['total_expenses'], '-41.00')
 
     def test_api_lists_reports_by_account(self):
-        account2 = Account.objects.create(name='Test Account 2', currency=self.currency)
+        account2 = Account.objects.create(name='Test Account 2', currency=self.currency, user = self.user)
         ReportAccount.objects.create(
+            user = self.user,
             from_date=date(2023, 1, 1),
             to_date=date(2023, 1, 31),
             account=account2,
@@ -136,16 +148,19 @@ class TestReportAccountViews(APITestCase):
     def test_api_lists_and_sorts_reports_by_from_date(self):
         reports = [
             ReportAccount(
+                user = self.user,
                 from_date=date(2023, 1, 1),
                 to_date=date(2023, 1, 31),
                 account=self.account,
             ),
             ReportAccount(
+                user = self.user,
                 from_date=date(2023, 2, 1),
                 to_date=date(2023, 2, 28),
                 account=self.account,
             ),
             ReportAccount(
+                user = self.user,
                 from_date=date(2023, 3, 1),
                 to_date=date(2023, 3, 31),
                 account=self.account,
@@ -233,11 +248,14 @@ class TestReportAccountViews(APITestCase):
 class TestReportCurrencyViews(APITestCase):
     def setUp(self):
         self.fake = Faker(['en-US'])
+        self.user = UserFactory()
+        self.token = RefreshToken.for_user(self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.token.access_token}')
         self.currency = Currency.objects.create(name='Test Currency', symbol='T')
         self.currency2 = Currency.objects.create(name='Test Currency 2', symbol='T2')
-        self.account1 = Account.objects.create(name='Test Account', currency=self.currency)
-        self.account2 = Account.objects.create(name='Test Account 2', currency=self.currency)
-        self.account3 = Account.objects.create(name='Test Account 3', currency=self.currency2)
+        self.account1 = Account.objects.create(name='Test Account', currency=self.currency, user = self.user)
+        self.account2 = Account.objects.create(name='Test Account 2', currency=self.currency, user = self.user)
+        self.account3 = Account.objects.create(name='Test Account 3', currency=self.currency2, user = self.user)
 
         self.data = {
             'from_date': date(2023, 1, 1),
@@ -245,40 +263,49 @@ class TestReportCurrencyViews(APITestCase):
             'currency': self.currency.id,
         }
     
-    def test_api_create_report(self):
-        TransactionFactory.create_batch(2, account=self.account1, date=datetime(2023, 1, 1, tzinfo=pytz.UTC), amount=75000)
-        TransactionFactory.create_batch(2, account=self.account2, date=datetime(2023, 1, 1, tzinfo=pytz.UTC), amount=-25000)
+    def get_transaction_factory(self, **kwargs):
+        return TransactionFactory(user=self.user, **kwargs)
+    
+    def get_currency_exchange_factory(self, **kwargs):
+        return CurrencyExchangeFactory(user=self.user, **kwargs)
 
-        ReportAccountFactory(
+    def get_report_account_factory(self, **kwargs):
+        return ReportAccountFactory(user=self.user, **kwargs)
+    
+    def test_api_create_report(self):
+        TransactionFactory.create_batch(2, user = self.user, account=self.account1, date=datetime(2023, 1, 1, tzinfo=pytz.UTC), amount=75000)
+        TransactionFactory.create_batch(2, user = self.user, account=self.account2, date=datetime(2023, 1, 1, tzinfo=pytz.UTC), amount=-25000)
+
+        self.get_report_account_factory(
             from_date=date(2023, 1, 1),
             to_date=date(2023, 1, 31),
             account=self.account1,
         )
-        ReportAccountFactory(
+        self.get_report_account_factory(
             from_date=date(2023, 1, 1),
             to_date=date(2023, 1, 31),
             account=self.account2,
         )
 
         # not same currency and out of date range
-        ReportAccountFactory(
+        self.get_report_account_factory(
             from_date=date(2022, 1, 1),
             to_date=date(2022, 1, 31),
             account= self.account3,
         )
-        TransactionFactory(
+        self.get_transaction_factory(
             account=self.account3,
             date=datetime(2023, 1, 1, tzinfo=pytz.UTC),
             amount=75000
         )
         # same currency exchanges should be ignored
-        ex1 = CurrencyExchangeFactory(
+        ex1 = self.get_currency_exchange_factory(
             account=self.account2,
             amount=-7000,
             date=datetime(2023, 1, 1, tzinfo=pytz.UTC),
             type = 'from_same_currency',
         )
-        ex2 = CurrencyExchangeFactory(
+        ex2 = self.get_currency_exchange_factory(
             account=self.account1,
             related_transaction = ex1,
             amount=7000,
@@ -289,15 +316,15 @@ class TestReportCurrencyViews(APITestCase):
         ex1.save()
 
         # other currency exchange Transactions
-        ex3 = CurrencyExchangeFactory(
+        ex3 = self.get_currency_exchange_factory(
             account=self.account2,
             amount=7000,
             date=datetime(2023, 1, 1, tzinfo=pytz.UTC),
             type='from_different_currency',
         )
-        ex4 = CurrencyExchangeFactory(
+        ex4 = self.get_currency_exchange_factory(
             account=self.account3,
-            related_transaction = ex1,
+            related_transaction = ex3,
             amount=-7000,
             date=datetime(2023, 1, 1, tzinfo=pytz.UTC),
             type='to_different_currency',
@@ -335,8 +362,9 @@ class TestReportCurrencyViews(APITestCase):
         self.assertEqual(ReportCurrency.objects.count(), 0)
 
     def test_api_lists_reports(self):
-        ReportCurrencyFactory(currency=self.currency)
+        ReportCurrencyFactory(currency=self.currency, user = self.user)
         ReportCurrencyFactory(
+            user = self.user,
             from_date=date(2020, 2, 1),
             to_date=date(2020, 2, 28),
             currency=self.currency
@@ -356,13 +384,15 @@ class TestReportCurrencyViews(APITestCase):
         self.assertEqual(json_data[0]['total_expenses'], '-250.00')
 
     def test_api_lists_reports_by_currency(self):
-        ReportCurrencyFactory(currency=self.currency)
+        ReportCurrencyFactory(currency=self.currency, user = self.user)
         ReportCurrencyFactory(
+            user = self.user,
             from_date=date(2020, 2, 1),
             to_date=date(2020, 2, 28),
             currency=self.currency
         )
         ReportCurrencyFactory(
+            user = self.user,
             currency=self.currency2,
         )
 
@@ -380,18 +410,21 @@ class TestReportCurrencyViews(APITestCase):
         self.assertEqual(json_data[0]['total_expenses'], '-250.00')
 
     def test_api_lists_and_sorts_reports_by_from_date(self):
-        AccountFactory(currency = self.currency)
+        AccountFactory(currency = self.currency, user = self.user)
         ReportCurrencyFactory(
+            user = self.user,
             from_date=date(2023, 1, 1),
             to_date=date(2023, 1, 31),
             currency = self.currency,
         )
         ReportCurrencyFactory(
+            user = self.user,
             from_date=date(2023, 2, 1),
             to_date=date(2023, 2, 28),
             currency = self.currency,
         )
         ReportCurrencyFactory(
+            user = self.user,
             from_date=date(2023, 3, 1),
             to_date=date(2023, 3, 31),
             currency = self.currency,
@@ -406,8 +439,8 @@ class TestReportCurrencyViews(APITestCase):
         self.assertEquals(json_data[2]['from_date'], '2023-01-01')
 
     def test_api_get_report(self):
-        AccountFactory(currency = self.currency)
-        report = ReportCurrencyFactory(currency = self.currency)
+        AccountFactory(currency = self.currency, user = self.user)
+        report = ReportCurrencyFactory(currency = self.currency, user = self.user)
         url = reverse('reports-currency-detail', kwargs={ 'pk': report.id })
         response = self.client.get(url, format='json')
 
@@ -422,7 +455,7 @@ class TestReportCurrencyViews(APITestCase):
         self.assertEqual(json_data['total_expenses'], '-250.00')
 
     def test_api_updates_report(self):
-        report = ReportCurrencyFactory()
+        report = ReportCurrencyFactory(user = self.user)
         url = reverse('reports-currency-detail', kwargs={ 'pk': report.id })
         data = {
             'from_date': date(2023, 2, 1),
@@ -439,18 +472,20 @@ class TestReportCurrencyViews(APITestCase):
 
     def test_api_updates_report_and_updates_calculations(self):
         ReportAccountFactory(
+            user = self.user,
             from_date=date(2023, 1, 1),
             to_date=date(2023, 1, 31),
             account=self.account1,
         )
         ReportAccountFactory(
+            user = self.user,
             from_date=date(2023, 1, 1),
             to_date=date(2023, 1, 31),
             account=self.account2,
         )
-        report = ReportCurrencyFactory(currency=self.currency)
-        TransactionFactory.create_batch(2, account=self.account1, date=datetime(2023, 1, 1, tzinfo=pytz.UTC), amount=75000)
-        TransactionFactory.create_batch(2, account=self.account2, date=datetime(2023, 1, 1, tzinfo=pytz.UTC), amount=-25000)
+        report = ReportCurrencyFactory(currency=self.currency, user = self.user)
+        TransactionFactory.create_batch(2, account=self.account1, date=datetime(2023, 1, 1, tzinfo=pytz.UTC), amount=75000, user = self.user)
+        TransactionFactory.create_batch(2, account=self.account2, date=datetime(2023, 1, 1, tzinfo=pytz.UTC), amount=-25000, user = self.user)
 
         url = reverse('reports-currency-detail', kwargs={ 'pk': report.id })
         data = {
@@ -480,7 +515,7 @@ class TestReportCurrencyViews(APITestCase):
         self.assertEqual(report.currency.id, self.currency.id)
     
     def test_api_deletes_report(self):
-        report = ReportCurrencyFactory()
+        report = ReportCurrencyFactory(user = self.user)
 
         url = reverse('reports-currency-detail', kwargs={ 'pk': report.id })
         response = self.client.delete(url, format='json')
