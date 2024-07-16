@@ -11,7 +11,7 @@ class TransactionFactory(DjangoModelFactory):
         model = Transaction
     
     user = factory.SubFactory(UserFactory)
-    amount = 1000
+    amount = factory.Faker('random_int', min=-2000, max=2000)
     description = 'transaction 1'
     account = factory.SubFactory(AccountFactory)
     category = None
