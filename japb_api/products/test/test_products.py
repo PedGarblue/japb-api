@@ -3,13 +3,17 @@ from faker import Faker
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
+from rest_framework_simplejwt.tokens import RefreshToken
 
-from ..models import Product
+from japb_api.users.factories import UserFactory
 from japb_api.transactions.models import Category
+from ..models import Product
 
 class TestProducts(APITestCase):
     def setUp(self):
         self.fake = Faker(['en-US'])
+        self.user = UserFactory()
+        self.token = RefreshToken.for_user(self.user)
         self.data = {
             'name': 'Test Product',
             'description': 'Test Product',
@@ -18,6 +22,7 @@ class TestProducts(APITestCase):
             # 'stock': 10,
             'status': 'ACTIVE',
         }
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.token.access_token}')
         self.response_create = self.client.post(reverse('products-list'), self.data, format='json')
 
     def test_api_create_product(self):

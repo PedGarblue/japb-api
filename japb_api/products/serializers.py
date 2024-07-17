@@ -9,6 +9,7 @@ class ProductSerializer(serializers.ModelSerializer):
         model = Product
         fields = [
             'id',
+            'user',
             'name',
             'description',
             'cost',
@@ -17,8 +18,11 @@ class ProductSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at'
         ]
+    
+    user = serializers.HiddenField(default = serializers.CurrentUserDefault())
 
 class ProductListItemSerializer(serializers.ModelSerializer):
+    user = serializers.HiddenField(default = serializers.CurrentUserDefault())
     total = serializers.IntegerField(read_only = True)
     product_name = serializers.CharField(source='product.name', read_only=True)
     product_cost = serializers.CharField(source='product.cost', read_only=True)
@@ -29,6 +33,7 @@ class ProductListItemSerializer(serializers.ModelSerializer):
         model = ProductListItem
         fields = [
             'id',
+            'user',
             'product',
             'product_name', # this is a read-only field
             'product_cost', # this is a read-only field
@@ -42,12 +47,14 @@ class ProductListItemSerializer(serializers.ModelSerializer):
         ]
 
 class ProductListSerializer(serializers.ModelSerializer):
+    user = serializers.HiddenField(default = serializers.CurrentUserDefault())
     total = serializers.SerializerMethodField()
 
     class Meta:
         model = ProductList
         fields = [
             'id',
+            'user',
             'name',
             'total',
             'description',
