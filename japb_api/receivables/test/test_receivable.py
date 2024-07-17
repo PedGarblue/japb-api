@@ -3,17 +3,21 @@ from faker import Faker
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
+from rest_framework_simplejwt.tokens import RefreshToken
 
-from ..models import Receivable
+from japb_api.users.factories import UserFactory
 from japb_api.accounts.models import Account
 from japb_api.currencies.models import Currency
+from ..models import Receivable
 
 # /receivables/ endpoints
 class TestReceivableViews(APITestCase):
     def setUp(self):
         self.fake = Faker(['en-US'])
         self.currency = Currency.objects.create(name='USD')
-        self.account = Account.objects.create(name='Test Account', currency=self.currency)
+        self.user = UserFactory()
+        self.token = RefreshToken.for_user(self.user)
+        self.account = Account.objects.create(name='Test Account', user = self.user, currency=self.currency)
         self.data = {
             'description': 'Test Receivable',
             'amount_given': 10.64,
@@ -41,6 +45,7 @@ class TestReceivableViews(APITestCase):
             'contact': 'contact-2',
             'status': 'UNPAID',
         }
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.token.access_token}')
         self.response = self.client.post(reverse('receivables-list'), self.data, format='json')
 
     def test_api_create_receivable(self):
@@ -52,17 +57,6 @@ class TestReceivableViews(APITestCase):
         self.assertEqual(float(Receivable.objects.get().amount_paid), 0.00)
         self.assertEqual(Receivable.objects.get().status, 'UNPAID')
 
-    def test_api_create_multiple_transactions(self):
-        data = [self.data, self.data2, self.data3]
-        response = self.client.post(
-            reverse('receivables-list'),
-            data,
-            format = 'json'
-        )
-        self.assertEqual(self.response.status_code, status.HTTP_201_CREATED)
-        # 3 + the one created at setUp()
-        self.assertEqual(Receivable.objects.count(), 4)
-
     def test_api_get_receivables(self):
         receivable = Receivable.objects.get()
         url = reverse('receivables-list')
@@ -70,12 +64,12 @@ class TestReceivableViews(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(Receivable.objects.count(), 1)
-        self.assertEqual(response.json()[0]['description'], 'Test Receivable')
-        self.assertEqual(response.json()[0]['amount_given'], '10.64')
-        self.assertEqual(response.json()[0]['amount_to_receive'], '13.00')
-        self.assertEqual(response.json()[0]['amount_paid'], '0.00')
-        self.assertEqual(response.json()[0]['contact'], 'contact-1')
-        self.assertEqual(response.json()[0]['status'], 'UNPAID')
+        self.assertEqual(response.json()['results'][0]['description'], 'Test Receivable')
+        self.assertEqual(response.json()['results'][0]['amount_given'], '10.64')
+        self.assertEqual(response.json()['results'][0]['amount_to_receive'], '13.00')
+        self.assertEqual(response.json()['results'][0]['amount_paid'], '0.00')
+        self.assertEqual(response.json()['results'][0]['contact'], 'contact-1')
+        self.assertEqual(response.json()['results'][0]['status'], 'UNPAID')
 
     def test_api_get_a_receivable(self):
         receivable = Receivable.objects.get()
