@@ -11,6 +11,12 @@ Just Another Personal Budget API.
 
 # Local Development
 
+Copy and modify at with your hosts  the `web.env.example` file:
+
+```bash
+    cp web.env.example web.env
+```
+
 Start the dev server for local development:
 ```bash
 docker-compose up
