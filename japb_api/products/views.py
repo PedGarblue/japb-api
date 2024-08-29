@@ -19,6 +19,7 @@ class ProductsViewSet(viewsets.ModelViewSet):
     filter_backends = (DjangoFilterBackend, filters.OrderingFilter)
     ordering_fields = ['category', 'cost', 'created_at', 'updated_at']
     filterset_class = ProductFilterSet
+    ordering = ['-category']
 
     def get_queryset(self):
         return Product.objects.filter(user=self.request.user)
@@ -29,6 +30,7 @@ class ProductsListViewSet(viewsets.ModelViewSet):
     filter_backends = (DjangoFilterBackend, filters.OrderingFilter)
     ordering_fields = ['created_at', 'updated_at']
     filterset_class = ProductListFilterSet
+    ordering = ['-updated_at']
 
     def get_queryset(self):
         return ProductList.objects.filter(user=self.request.user)
@@ -39,6 +41,7 @@ class ProductListItemViewSet(viewsets.ModelViewSet):
     filter_backends = (DjangoFilterBackend, filters.OrderingFilter)
     filterset_class = ProductListItemFilterSet
     ordering_fields = ['total', 'product__category', 'created_at', 'updated_at']
+    ordering = ['-product__category']
 
     def get_queryset(self):
         return ProductListItem.objects.filter(user=self.request.user)\

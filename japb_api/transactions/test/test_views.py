@@ -116,10 +116,10 @@ class TestCurrencyTransaction(APITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         # only one transaction created by the user
-        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(len(response.json()['results']), 1)
         # amount
-        self.assertEquals(response.json()[0]['amount'], '-50.00')
-        self.assertEquals(response.json()[0]['category'], self.category.id)
+        self.assertEquals(response.json()['results'][0]['amount'], '-50.00')
+        self.assertEquals(response.json()['results'][0]['category'], self.category.id)
 
     def test_api_get_a_user_transaction(self):
         transaction = Transaction.objects.get()
@@ -206,9 +206,9 @@ class TestCurrencyTransaction(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(Transaction.objects.count(), 4)
-        self.assertEqual(len(response.json()), 2)
-        self.assertEqual(response.json()[1]['description'], 'transaction 2')
-        self.assertEqual(response.json()[0]['description'], 'transaction 3')
+        self.assertEqual(len(response.json()['results']), 2)
+        self.assertEqual(response.json()['results'][1]['description'], 'transaction 2')
+        self.assertEqual(response.json()['results'][0]['description'], 'transaction 3')
     
     def test_api_get_transaction_by_datetime(self):
         # add transacions to the account
@@ -225,9 +225,9 @@ class TestCurrencyTransaction(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(Transaction.objects.count(), 4)
-        self.assertEqual(len(response.json()), 2)
-        self.assertEqual(response.json()[1]['description'], 'transaction 2')
-        self.assertEqual(response.json()[0]['description'], 'transaction 3')
+        self.assertEqual(len(response.json()['results']), 2)
+        self.assertEqual(response.json()['results'][1]['description'], 'transaction 2')
+        self.assertEqual(response.json()['results'][0]['description'], 'transaction 3')
 
     def test_api_get_transaction_by_account(self):
         # add transacions to the account
@@ -244,10 +244,10 @@ class TestCurrencyTransaction(APITestCase):
         response = self.client.get(url, format='json')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.json()), 3)
-        self.assertEqual(response.json()[0]['description'], 'transaction 2')
-        self.assertEqual(response.json()[1]['description'], 'transaction 1')
-        self.assertEqual(response.json()[2]['description'], 'Purchase')
+        self.assertEqual(len(response.json()['results']), 3)
+        self.assertEqual(response.json()['results'][0]['description'], 'Purchase')
+        self.assertEqual(response.json()['results'][1]['description'], 'transaction 2')
+        self.assertEqual(response.json()['results'][2]['description'], 'transaction 1')
 
     def test_api_get_transaction_by_currency(self):
         # add transacions to the account
@@ -267,10 +267,10 @@ class TestCurrencyTransaction(APITestCase):
         response = self.client.get(url, format='json')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.json()), 3)
-        self.assertEqual(response.json()[0]['description'], 'transaction 3')
-        self.assertEqual(response.json()[1]['description'], 'transaction 2')
-        self.assertEqual(response.json()[2]['description'], 'transaction 1')
+        self.assertEqual(len(response.json()['results']), 3)
+        self.assertEqual(response.json()['results'][0]['description'], 'transaction 3')
+        self.assertEqual(response.json()['results'][1]['description'], 'transaction 2')
+        self.assertEqual(response.json()['results'][2]['description'], 'transaction 1')
 
     def test_api_get_transaction_by_exclude_same_currency_exchanges(self):
         # add transacions to the account
@@ -306,9 +306,9 @@ class TestCurrencyTransaction(APITestCase):
         response = self.client.get(url, format='json')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.json()), 2)
-        self.assertEqual(response.json()[1]['description'], self.data['description'])
-        self.assertEqual(response.json()[0]['description'], 'transaction 1')
+        self.assertEqual(len(response.json()['results']), 2)
+        self.assertEqual(response.json()['results'][0]['description'], self.data['description'])
+        self.assertEqual(response.json()['results'][1]['description'], 'transaction 1')
 
     ### CURRENCY EXCHANGES
 

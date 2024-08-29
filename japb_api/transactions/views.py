@@ -28,15 +28,11 @@ class TransactionViewSet(viewsets.ModelViewSet):
     filter_backends = (DjangoFilterBackend, filters.OrderingFilter)
     filterset_class = TransactionFilterSet
     ordering_fields = ['date']
+    ordering = ['-date']
     permission_classes = (IsAuthenticated, IsOwner,)
 
     def get_queryset(self):
         return Transaction.objects.filter(user=self.request.user)
-
-    def list(self, request):
-        qs = self.filter_queryset(self.get_queryset())
-        serializer = TransactionSerializer(qs, many=True)
-        return Response(serializer.data)
 
     def create(self, request):
         transactions_data = request.data

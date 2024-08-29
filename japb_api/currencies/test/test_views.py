@@ -94,10 +94,10 @@ class TestCurrencyViews(APITestCase):
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.json()['results'][0]['id'], main_currency.id)
-        self.assertEqual(response.json()['results'][0]['name'], 'USD')
-        self.assertEqual(response.json()['results'][0]['symbol'], '$')
-        self.assertEqual(response.json()['results'][0]['balance'], SUM_OF_MAIN_CURRENCY_TRANSACTIONS)
+        self.assertEqual(response.json()['results'][1]['id'], main_currency.id)
+        self.assertEqual(response.json()['results'][1]['name'], 'USD')
+        self.assertEqual(response.json()['results'][1]['symbol'], '$')
+        self.assertEqual(response.json()['results'][1]['balance'], SUM_OF_MAIN_CURRENCY_TRANSACTIONS)
 
     def test_api_get_a_currency(self):
         currency = CurrencyFactory()
