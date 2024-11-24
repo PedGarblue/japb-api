@@ -52,6 +52,7 @@ class ExchangeComissionSerializer(serializers.ModelSerializer):
             'category',
             'exchange_from',
             'exchange_to',
+            'user',
             'type',
         ]
         read_only_fields = ['id']

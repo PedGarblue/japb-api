@@ -182,11 +182,13 @@ class CurrencyExchangeViewSet(viewsets.ModelViewSet):
                 'type': 'comission' if request.data['from_amount'] >= request.data['to_amount'] else 'profit',
                 'exchange_from': from_account_transaction.id,
                 'exchange_to': to_account_transaction.id,
+                'user': request.user.id,
             }
             if category_comission:
                 comission_transaction_data['category'] = category_comission.id
 
             comission_transaction_serializer = ExchangeComissionSerializer(data = comission_transaction_data)
+
             if comission_transaction_serializer.is_valid():
                 comission_transaction_serializer.save()
                 response.append(comission_transaction_serializer.data)

@@ -453,6 +453,7 @@ class TestCurrencyTransaction(APITestCase):
         # the comission transaction should be created with the correct amount
         self.assertEqual(response_comission.amount, -5000)
         # the comission transaction should be related to the other transactions
+        self.assertEqual(response_comission.user, self.user)
         self.assertEqual(response_comission.exchange_from, response_from)
         self.assertEqual(response_comission.exchange_to, response_to)
         # rest the comission amount from the from_account
