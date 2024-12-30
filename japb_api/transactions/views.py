@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
-
+from .tasks import update_reports
 from ..accounts.models import Account
 from .permissions import IsOwnerOrReadOnly, IsOwner
 from .models import Transaction, CurrencyExchange, Category
@@ -51,6 +51,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
             if transaction_serializer.is_valid():
                 transaction = transaction_serializer.save()
                 created_transactions.append(transaction_serializer.data)
+                update_reports.delay(transaction.account.id)
             else:
                 return Response(transaction_serializer.errors,
                                 status=status.HTTP_400_BAD_REQUEST)
