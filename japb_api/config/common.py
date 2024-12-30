@@ -49,9 +49,9 @@ class Common(Configuration):
 
     CORS_ALLOWED_ORIGINS = [
         # split by comma
-        *os.getenv('DJANGO_CORS_ORIGIN_WHITELIST').split(',')
+        *os.getenv('DJANGO_CORS_ORIGIN_WHITELIST', 'http://localhost:3000').split(',')
     ]
-    ALLOWED_HOSTS = [*os.getenv('DJANGO_ALLOWED_HOSTS').split(',')]
+    ALLOWED_HOSTS = ['web', *os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost').split(',')]
     ROOT_URLCONF = 'japb_api.urls'
     SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
     WSGI_APPLICATION = 'japb_api.wsgi.application'
@@ -62,6 +62,11 @@ class Common(Configuration):
     ADMINS = (
         ('Author', 'budarepierre@gmail.com'),
     )
+
+    # Celery Configuration
+    CELERY_BROKER_URL = 'redis://redis:6379/0'  # Use Redis as the message broker
+    CELERY_ACCEPT_CONTENT = ['json']
+    CELERY_TASK_SERIALIZER = 'json'
 
     # Postgres
     DATABASES = {

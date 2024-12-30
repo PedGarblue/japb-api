@@ -2,11 +2,18 @@ version: '3'
 services:
   postgres:
     image: postgres:11.6
+
+  redis:
+    image: redis:7.0
+    restart: always
+
   web:
     env_file: web.env
     restart: always
     environment:
       - DJANGO_SECRET_KEY=local
+      - DJANGO_SETTINGS_MODULE=japb_api.config.local # Adjust for your environment
+      - DJANGO_CONFIGURATION=Local
     build: ./
     command: >
       bash -c "python wait_for_postgres.py &&
@@ -17,3 +24,31 @@ services:
       - "8000:8000"
     depends_on:
       - postgres
+      - redis
+
+  celery:
+    build: ./
+    command: >
+      bash -c "./wait-for-web.sh http://web:8000 &&
+               celery -A japb_api worker --loglevel=info"
+    env_file: web.env
+    volumes:
+      - ./:/code
+    working_dir: /code
+    depends_on:
+      - redis
+      - web
+
+  celery-beat:
+    build: ./
+    command: >
+      bash -c "./wait-for-web.sh http://web:8000 &&
+               celery -A japb_api beat --loglevel=info"
+    env_file: web.env
+    volumes:
+      - ./:/code
+    working_dir: /code
+    depends_on:
+      - celery
+      - redis
+      - web

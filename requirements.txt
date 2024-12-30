@@ -38,3 +38,5 @@ faker==18.4.0
 django-storages==1.13.2
 boto3==1.26.89
 
+# celery
+celery[redis]==5.3.1
