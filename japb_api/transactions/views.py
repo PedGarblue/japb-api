@@ -75,10 +75,13 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
         if serializer.is_valid():
             serializer.save()
+            update_reports.delay(transaction.account.id) 
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     def destroy(self, request, *args, **kwargs):
+        transaction_pk = self.get_queryset().get(pk=kwargs['pk'])
+        update_reports.delay(transaction_pk.account.id) 
         return super().destroy(request, *args, **kwargs)
     
 class CurrencyExchangeViewSet(viewsets.ModelViewSet):
@@ -192,6 +195,8 @@ class CurrencyExchangeViewSet(viewsets.ModelViewSet):
 
             if comission_transaction_serializer.is_valid():
                 comission_transaction_serializer.save()
+                update_reports.delay(from_account_transaction.account.id)
+                update_reports.delay(to_account_transaction.account.id) 
                 response.append(comission_transaction_serializer.data)
             else:
                 return Response({ 'comission_data': comission_transaction_serializer.errors }, status = status.HTTP_400_BAD_REQUEST)
