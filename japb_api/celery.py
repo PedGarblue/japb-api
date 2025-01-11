@@ -18,8 +18,8 @@ app.config_from_object('django.conf:settings', namespace='CELERY')
 app.autodiscover_tasks()
 
 app.conf.beat_schedule = {
-    'delete_duplicated_reports': {
-        'task': 'japb_api.reports.tasks.delete_duplicated_reports',
+    'update_user_reports': {
+        'task': 'japb_api.reports.tasks.update_user_reports',
         'schedule': crontab(minute=0, hour=0),
     },
     'debug_task': {
