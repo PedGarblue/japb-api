@@ -19,6 +19,7 @@ djangorestframework-simplejwt==5.3.1
 Markdown>=3.2
 django-filter==22.1
 django-cors-headers>=3.14.0
+requests>=2.32
 
 # Developer Tools
 ipdb==0.13.13

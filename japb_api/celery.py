@@ -22,6 +22,10 @@ app.conf.beat_schedule = {
         'task': 'japb_api.reports.tasks.update_user_reports',
         'schedule': crontab(minute=0, hour=0),
     },
+    'update_currency_historial': {
+        'task': 'japb_api.currencies.tasks.update_currency_historial',
+        'schedule': crontab(minute=0, hour=0),
+    },
     'debug_task': {
         'task': 'japb_api.celery.debug_task',
         'schedule': 30.0,

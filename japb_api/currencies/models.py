@@ -8,3 +8,15 @@ class Currency(models.Model):
 
     def __str__(self):
         return self.name
+
+class CurrencyConversionHistorial(models.Model):
+    # some currencies are global and some are user specific
+    user = models.ForeignKey('users.User', null = True, on_delete=models.CASCADE)
+    currency_from = models.ForeignKey('Currency', related_name='currency_from', on_delete=models.CASCADE)
+    # always be USD for now
+    currency_to = models.ForeignKey('Currency', related_name='currency_to', on_delete=models.CASCADE)
+    rate = models.FloatField()
+    date = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.currency_from} to {self.currency_to} - {self.rate}'
