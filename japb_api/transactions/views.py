@@ -9,6 +9,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from .tasks import update_reports
 from ..accounts.models import Account
+from japb_api.currencies.models import CurrencyConversionHistorial
 from .permissions import IsOwnerOrReadOnly, IsOwner
 from .models import Transaction, CurrencyExchange, Category
 from .serializers import \
@@ -43,10 +44,21 @@ class TransactionViewSet(viewsets.ModelViewSet):
         for transaction_data in transactions_data:
 
             transaction_serializer = self.get_serializer(data=transaction_data)
+            account = Account.objects.get(pk=transaction_serializer.initial_data.get('account'))
 
             amount = float(transaction_serializer.initial_data.get('amount'))
-            decimal_places = Account.objects.get(pk=transaction_serializer.initial_data.get('account')).decimal_places
+            decimal_places = account.decimal_places
+
             transaction_serializer.initial_data['amount'] = parse_amount(amount, decimal_places)
+
+            # check if there is a conversion available for today
+            conversion = CurrencyConversionHistorial.objects.filter(
+                currency_from=account.currency,
+                currency_to__name='USD',
+            ).order_by('-date').first()
+            if conversion:
+                transaction_serializer.initial_data['to_main_currency_amount'] = int(parse_amount(amount, 2) / conversion.rate)
+            
 
             if transaction_serializer.is_valid():
                 transaction = transaction_serializer.save()

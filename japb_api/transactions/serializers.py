@@ -7,32 +7,19 @@ from japb_api.accounts.models import Account
 
 class TransactionSerializer(serializers.ModelSerializer):
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
-    to_main_currency_amount = serializers.SerializerMethodField()
-    
-    def get_to_main_currency_amount(self, instance):
-        if instance.account.currency.name == 'USD':
-            return 0
-        # search if there is a rate of the transaction date
-        conversion = CurrencyConversionHistorial.objects.filter(
-            date__lte=instance.date,
-            currency_from=instance.account.currency,
-            currency_to=Currency.objects.get(name='USD')
-        ).order_by('-date').first()
 
-        if conversion:
-            to_main_currency_amount = (instance.amount / (10 ** instance.account.decimal_places)) / conversion.rate
-            return f'{to_main_currency_amount:.2f}'
-        else:
-            return 0
     class Meta:
         model = Transaction
         fields = ['id','user', 'amount', 'to_main_currency_amount', 'description', 'account', 'category', 'date',]
-        read_only_fields = ['id', 'to_main_currency_amount']
+        read_only_fields = ['id']
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
         amount = rep.get('amount') / (10 ** instance.account.decimal_places)
         rep['amount'] = f'{amount:.{instance.account.decimal_places}f}'
+        if instance.to_main_currency_amount:
+            to_main_currency_amount = instance.to_main_currency_amount / (10 ** instance.account.decimal_places)
+            rep['to_main_currency_amount'] = f'{to_main_currency_amount:.2f}'
         return rep
 
 class CurrencyExchangeSerializer(serializers.ModelSerializer):
