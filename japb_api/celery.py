@@ -24,15 +24,7 @@ app.conf.beat_schedule = {
     },
     'update_currency_historial': {
         'task': 'japb_api.currencies.tasks.update_currency_historial',
-        'schedule': crontab(minute=30, hour='9,14'),
-    },
-    'debug_task': {
-        'task': 'japb_api.celery.debug_task',
-        'schedule': 30.0,
+        # 9:30 VET (13:30 UTC) and 13:30 VET (17:30 UTC)
+        'schedule': crontab(minute=30, hour='13,17'),
     },
 }
-
-
-@app.task()
-def debug_task():
-    print(f'Request: CRONTAB')
