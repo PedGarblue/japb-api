@@ -13,28 +13,28 @@ class Migration(migrations.Migration):
     operations = [
         migrations.RunPython(
             code=lambda apps, schema_editor: [
-                # create comission transactions for the updated currency exchanges
-                ExchangeComission.objects.create(
-                    # amount is negative and the related_transaction amount is positive
-                    user=None,
-                    amount=currency_exchange.amount + currency_exchange.related_transaction.amount,
-                    account=currency_exchange.account,
-                    description=f'Comission for [{currency_exchange.description}]',
-                    date=currency_exchange.date,
-                    exchange_from=currency_exchange,
-                    exchange_to=currency_exchange.related_transaction,
-                )
-                for currency_exchange in CurrencyExchange.objects.filter(
-                    type='from_same_currency',
-                    amount__lt=-models.F('related_transaction__amount')
-                )
+                # # create comission transactions for the updated currency exchanges
+                # ExchangeComission.objects.create(
+                #     # amount is negative and the related_transaction amount is positive
+                #     user=None,
+                #     amount=currency_exchange.amount + currency_exchange.related_transaction.amount,
+                #     account=currency_exchange.account,
+                #     description=f'Comission for [{currency_exchange.description}]',
+                #     date=currency_exchange.date,
+                #     exchange_from=currency_exchange,
+                #     exchange_to=currency_exchange.related_transaction,
+                # )
+                # for currency_exchange in CurrencyExchange.objects.filter(
+                #     type='from_same_currency',
+                #     amount__lt=-models.F('related_transaction__amount')
+                # )
             ],
             reverse_code=lambda apps, schema_editor: [
                 # delete the created comission transactions
-                ExchangeComission.objects.filter(
-                    exchange_from__type='from_same_currency',
-                    exchange_from__amount__lt=-models.F('exchange_to__amount')
-                ).delete()
+                # ExchangeComission.objects.filter(
+                #     exchange_from__type='from_same_currency',
+                #     exchange_from__amount__lt=-models.F('exchange_to__amount')
+                # ).delete()
             ]
         ),
     ]
