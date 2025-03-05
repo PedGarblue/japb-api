@@ -97,7 +97,7 @@ class TestCurrencyViews(APITestCase):
         self.assertEqual(response.json()['results'][1]['id'], main_currency.id)
         self.assertEqual(response.json()['results'][1]['name'], 'USD')
         self.assertEqual(response.json()['results'][1]['symbol'], '$')
-        self.assertEqual(response.json()['results'][1]['balance'], SUM_OF_MAIN_CURRENCY_TRANSACTIONS)
+        self.assertEqual(response.json()['results'][1]['balance'], '{:.2f}'.format(SUM_OF_MAIN_CURRENCY_TRANSACTIONS))
 
     def test_api_get_a_currency(self):
         currency = CurrencyFactory()
@@ -147,7 +147,7 @@ class TestCurrencyViews(APITestCase):
         self.assertEqual(response.json()['id'], main_currency.id)
         self.assertEqual(response.json()['name'], main_currency.name)
         self.assertEqual(response.json()['symbol'], main_currency.symbol)
-        self.assertEqual(response.json()['balance'], SUM_OF_MAIN_CURRENCY_TRANSACTIONS)
+        self.assertEqual(response.json()['balance'], '{:.2f}'.format(SUM_OF_MAIN_CURRENCY_TRANSACTIONS))
 
 
     def test_api_admin_can_update_a_currency(self):

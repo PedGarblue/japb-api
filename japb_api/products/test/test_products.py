@@ -71,3 +71,54 @@ class TestProducts(APITestCase):
         response = self.client.delete(reverse('products-detail', kwargs={'pk': 1}))
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(Product.objects.count(), 0)
+
+    def test_api_can_search_products_by_name(self):
+        # Create additional test products
+        Product.objects.create(
+            name='Orange Juice',
+            description='Fresh orange juice',
+            cost=250,
+            user=self.user
+        )
+        Product.objects.create(
+            name='Banana Smoothie',
+            description='Contains apple juice',
+            cost=350,
+            user=self.user
+        )
+
+        url = reverse('products-list') + '?search=Test'
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['name'], 'Test Product')
+
+    def test_api_can_search_products_by_description(self):
+        Product.objects.create(
+            name='Smoothie',
+            description='Test flavor smoothie',
+            cost=350,
+            user=self.user
+        )
+
+        url = reverse('products-list') + '?search=Test'
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 2)  # Should find both products with "Test" in name or description
+
+    def test_api_search_products_case_insensitive(self):
+        url = reverse('products-list') + '?search=test'  # lowercase search
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['name'], 'Test Product')
+
+    def test_api_search_products_no_results(self):
+        url = reverse('products-list') + '?search=nonexistent'
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 0)

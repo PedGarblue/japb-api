@@ -16,10 +16,11 @@ from .serializers import ProductSerializer,\
 class ProductsViewSet(viewsets.ModelViewSet):
     serializer_class = ProductSerializer
     permission_classes = (IsAuthenticated, IsOwner,)
-    filter_backends = (DjangoFilterBackend, filters.OrderingFilter)
+    filter_backends = (DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter)
     ordering_fields = ['category', 'cost', 'created_at', 'updated_at']
     filterset_class = ProductFilterSet
     ordering = ['-category']
+    search_fields = ['name', 'description']
 
     def get_queryset(self):
         return Product.objects.filter(user=self.request.user)

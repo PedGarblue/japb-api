@@ -14,8 +14,14 @@ class CurrencySerializer(serializers.ModelSerializer):
         read_only_field = ['id', 'created_at', 'balance']
 
     def get_latest_conversion_rate_to_main(self, currency):
-        queryset = CurrencyConversionHistorial.objects.filter(currency_from = currency.id, currency_to = Currency.objects.get(name = 'USD'))
+        try:
+            usd_currency = Currency.objects.get(name='USD')
+        except Currency.DoesNotExist:
+            return None
+
+        queryset = CurrencyConversionHistorial.objects.filter(currency_from = currency.id, currency_to = usd_currency)
         conversion = queryset.order_by('-date').first()
+
         if conversion:
             return conversion.rate
         else:
@@ -37,8 +43,10 @@ class CurrencySerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         rep = super().to_representation(instance)
 
-        Accounts = Account.objects.filter(currency = instance.id, user = self.context['request'].user)
-        max_decimal_places = max([account.decimal_places for account in Accounts])
+        accounts = Account.objects.filter(currency = instance.id, user = self.context['request'].user)
+        max_decimal_places = 2  # Default decimal places
+        if accounts.exists():
+            max_decimal_places = max([account.decimal_places for account in accounts])
         
         rep['balance'] = f'{rep["balance"]:.{max_decimal_places}f}'
         if rep['balance_as_main_currency']:
