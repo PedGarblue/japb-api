@@ -19,5 +19,6 @@ class CurrencyConversionHistorialFactory(DjangoModelFactory):
     currency_from = SubFactory(CurrencyFactory)
     currency_to = SubFactory(CurrencyFactory)
     rate = 1.0  # Default conversion rate
+    date = faker.Faker().date_time()
 
     

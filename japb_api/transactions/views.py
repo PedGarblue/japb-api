@@ -51,11 +51,13 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
             transaction_serializer.initial_data['amount'] = parse_amount(amount, decimal_places)
 
-            # check if there is a conversion available for today
+            # Get conversion for the transaction date
             conversion = CurrencyConversionHistorial.objects.filter(
                 currency_from=account.currency,
                 currency_to__name='USD',
+                date__lte=transaction_serializer.initial_data.get('date')
             ).order_by('-date').first()
+            
             if conversion:
                 transaction_serializer.initial_data['to_main_currency_amount'] = int(parse_amount(amount, 2) / conversion.rate)
             
