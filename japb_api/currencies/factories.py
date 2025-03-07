@@ -1,6 +1,5 @@
-import faker
 from factory.django import DjangoModelFactory
-from factory import SubFactory
+from factory import SubFactory, Faker
 
 from japb_api.currencies.models import Currency, CurrencyConversionHistorial
 
@@ -8,8 +7,9 @@ from japb_api.currencies.models import Currency, CurrencyConversionHistorial
 class CurrencyFactory(DjangoModelFactory):
     class Meta:
         model = Currency
-    name = 'Euro'
-    symbol = '€'
+    
+    name = Faker('currency_code')  # Generates random currency codes like 'USD', 'EUR', etc.
+    symbol = Faker('currency_symbol')
 
 class CurrencyConversionHistorialFactory(DjangoModelFactory):
     class Meta:
@@ -19,6 +19,6 @@ class CurrencyConversionHistorialFactory(DjangoModelFactory):
     currency_from = SubFactory(CurrencyFactory)
     currency_to = SubFactory(CurrencyFactory)
     rate = 1.0  # Default conversion rate
-    date = faker.Faker().date_time()
+    date = Faker('date_time')
 
     

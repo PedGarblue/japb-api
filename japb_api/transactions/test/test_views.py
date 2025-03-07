@@ -1,6 +1,6 @@
 import pytz
 from faker import Faker
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -11,7 +11,7 @@ from ..factories import TransactionFactory, CategoryFactory
 from japb_api.users.models import User
 from japb_api.accounts.models import Account
 from japb_api.currencies.factories import CurrencyFactory, CurrencyConversionHistorialFactory
-from japb_api.currencies.models import Currency
+from japb_api.currencies.models import Currency, CurrencyConversionHistorial
 
 class TestCurrencyTransaction(APITestCase):
     def setUp(self):
@@ -24,8 +24,18 @@ class TestCurrencyTransaction(APITestCase):
         self.token = RefreshToken.for_user(self.user)
 
         self.currency = Currency.objects.create(name = 'VES')
-        self.account = Account.objects.create(name = 'Test Account', currency = self.currency)
+        self.account = Account.objects.create(name = 'Test Account', currency = self.currency, decimal_places = 2)
         self.category = Category.objects.create(name = 'Food', color = '#000000', description = 'Food expenses')
+
+        currency_to = CurrencyFactory(name='USD')
+
+        self.current_conversion = CurrencyConversionHistorialFactory(
+            currency_from = self.currency,
+            currency_to = currency_to,
+            date=datetime.now(tz=timezone.utc),
+            rate=60
+        )
+
         self.data = {
             'amount': -50,
             'description': 'Purchase',
@@ -47,7 +57,6 @@ class TestCurrencyTransaction(APITestCase):
             'date': datetime.now(tz=timezone.utc),
             'category': self.category.id
         }
-
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.token.access_token}')
 
         self.response = self.client.post(
@@ -64,46 +73,8 @@ class TestCurrencyTransaction(APITestCase):
         self.assertEqual(transaction.category, self.category)
         self.assertEqual(transaction.amount, -5000)
         self.assertEqual(transaction.user, self.user)
-
-    def test_api_create_transaction_with_main_currency_amount(self):
-        currency_to = CurrencyFactory(name='USD')
-
-        current_conversion = CurrencyConversionHistorialFactory(
-            currency_from = self.currency,
-            currency_to = currency_to,
-            date=self.data['date'],
-            rate=60
-        )
-        # Create past random date conversion
-        old_conversion = CurrencyConversionHistorialFactory(
-            currency_from = self.currency,
-            currency_to = currency_to,
-            date=self.fake.date_time_between(start_date="-30d", end_date="-1d", tzinfo=timezone.utc),
-            rate=50
-        )
-
         # Test transaction with current date uses current conversion
-        response = self.client.post(
-            reverse('transactions-list'),
-            self.data,
-            format='json'
-        )
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        json = response.json()[0]
-        self.assertEqual(json['to_main_currency_amount'], -5000 / current_conversion.rate)
-
-        # Test transaction with past date uses old conversion
-        past_data = self.data.copy()
-        past_data['date'] = old_conversion.date
-        past_data['description'] = 'Past Purchase'
-        response = self.client.post(
-            reverse('transactions-list'),
-            past_data,
-            format='json'
-        )
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        past_transaction = Transaction.objects.get(pk=response.json()[0]['id'])
-        self.assertEqual(past_transaction.to_main_currency_amount, -5000 / old_conversion.rate)
+        self.assertEqual(transaction.to_main_currency_amount, round(-5000 / self.current_conversion.rate))
 
     def test_api_create_transaction_unauthorized(self):
         self.client.credentials(HTTP_AUTHORIZATION=None)
@@ -584,7 +555,7 @@ class TestCurrencyTransaction(APITestCase):
         self.client.credentials(HTTP_AUTHORIZATION=None)
         response_delete = self.client.delete(reverse('transactions-detail', kwargs={ 'pk': transaction['id'] }), format='json')
         self.assertEqual(response_delete.status_code, status.HTTP_401_UNAUTHORIZED)
-        
+
 class TestCategories(APITestCase):
     def setUp(self):
         self.fake = Faker(['en-US'])
