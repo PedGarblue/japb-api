@@ -2,10 +2,8 @@ from django.db.models import Q
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets, filters
 from rest_framework import serializers
-from rest_framework.decorators import api_view, action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from .tasks import update_reports
 from ..accounts.models import Account
@@ -102,6 +100,26 @@ class TransactionViewSet(viewsets.ModelViewSet):
             pk=serializer.initial_data.get("account")
         ).decimal_places
         serializer.initial_data["amount"] = parse_amount(amount, decimal_places)
+        account = Account.objects.get(pk=serializer.initial_data.get("account"))
+
+        if account.currency.name == "USD":
+            serializer.initial_data["to_main_currency_amount"] = None
+
+        # Get conversion for the transaction date
+        conversion = (
+            CurrencyConversionHistorial.objects.filter(
+                currency_from=account.currency,
+                currency_to__name="USD",
+                date__lte=serializer.initial_data.get("date"),
+            )
+            .order_by("-date")
+            .first()
+        )
+
+        if conversion:
+            serializer.initial_data["to_main_currency_amount"] = int(
+                parse_amount(amount, 2) / conversion.rate
+            )
 
         if serializer.is_valid():
             serializer.save()
@@ -157,8 +175,7 @@ class CurrencyExchangeViewSet(viewsets.ModelViewSet):
         comission_amount = request.data["from_amount"] - request.data["to_amount"]
 
         from_account_transaction_data = {
-            "amount": -float(request.data["from_amount"])
-            - (
+            "amount": -float(request.data["from_amount"]) - (
                 -comission_amount if account_from.currency == account_to.currency else 0
             ),
             "account": request.data["from_account"],
@@ -290,7 +307,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
         for category_data in categories_data:
             category_serializer = self.get_serializer(data=category_data)
             if category_serializer.is_valid():
-                category = category_serializer.save()
+                category_serializer.save()
                 created_categories.append(category_serializer.data)
             else:
                 return Response(

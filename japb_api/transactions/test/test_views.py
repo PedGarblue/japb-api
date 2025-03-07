@@ -1,6 +1,6 @@
 import pytz
 from faker import Faker
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -14,7 +14,7 @@ from japb_api.currencies.factories import (
     CurrencyFactory,
     CurrencyConversionHistorialFactory,
 )
-from japb_api.currencies.models import Currency
+from japb_api.currencies.models import Currency, CurrencyConversionHistorial
 
 
 class TestCurrencyTransaction(APITestCase):
@@ -35,11 +35,11 @@ class TestCurrencyTransaction(APITestCase):
             name="Food", color="#000000", description="Food expenses"
         )
 
-        currency_to = CurrencyFactory(name="USD")
+        self.main_currency = CurrencyFactory(name="USD")
 
         self.current_conversion = CurrencyConversionHistorialFactory(
             currency_from=self.currency,
-            currency_to=currency_to,
+            currency_to=self.main_currency,
             date=datetime.now(tz=timezone.utc),
             rate=60,
         )
@@ -170,6 +170,53 @@ class TestCurrencyTransaction(APITestCase):
         self.assertEqual(updated_transaction.description, "New transaction")
         self.assertEqual(updated_transaction.amount, -500)
 
+    def test_api_update_transaction_updates_to_main_currency_amount(self):
+        transaction = Transaction.objects.get()
+        new_data = {
+            "description": "New transaction",
+            "amount": -1200,
+            "account": self.account.id,
+            "date": transaction.date,
+        }
+
+        response = self.client.put(
+            reverse("transactions-detail", kwargs={"pk": transaction.id}),
+            data=new_data,
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        transaction.refresh_from_db()
+        self.assertEqual(transaction.to_main_currency_amount, -2000)
+
+    def test_api_update_transaction_removes_to_main_currency_amount_when_currency_changes(self):
+        transaction = Transaction.objects.get()
+
+        # create a new account with a different currency
+        account2 = Account.objects.create(
+            name="Test Account 2", currency=self.main_currency, decimal_places=2
+        )
+
+        new_data = {
+            "description": "New transaction",
+            "amount": -5,
+            "account": account2.id,
+            "date": datetime.now(tz=timezone.utc),
+        }
+
+        self.assertEqual(transaction.to_main_currency_amount, -83)
+
+        response = self.client.put(
+            reverse("transactions-detail", kwargs={"pk": transaction.id}),
+            data=new_data,
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        transaction.refresh_from_db()
+
+        self.assertEqual(transaction.to_main_currency_amount, None)
+
     def test_api_update_transaction_unauthorized(self):
         transaction = Transaction.objects.get()
         new_data = {
@@ -293,8 +340,7 @@ class TestCurrencyTransaction(APITestCase):
         Transaction.objects.bulk_create(transactions)
 
         url = (
-            reverse("transactions-list")
-            + "?start_date=2023-03-01T00:00:00Z&end_date=2023-03-01T23:59:59Z"
+            reverse("transactions-list") + "?start_date=2023-03-01T00:00:00Z&end_date=2023-03-01T23:59:59Z"
         )
         response = self.client.get(url, format="json")
 
