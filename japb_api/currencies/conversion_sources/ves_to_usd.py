@@ -1,24 +1,23 @@
 import requests
 from japb_api.currencies.models import CurrencyConversionHistorial
 
+
 class VesToUsd:
     def getLatestRate():
-        url = 'https://pydolarve.org/api/v1/dollar'
+        url = "https://pydolarve.org/api/v1/dollar"
         params = {
-            'page': 'enparalelovzla',
-            'format_date': 'iso',
-            'rounded_price': 'true'
+            "page": "enparalelovzla",
+            "format_date": "iso",
+            "rounded_price": "true",
         }
-        headers = {
-            'Content-Type': 'application/json'
-        }
+        headers = {"Content-Type": "application/json"}
 
         # EXPECTED RESPONSE:
         # {
         #     "datetime": {
-        #         "date": 
+        #         "date":
         #         "domingo, 12 de enero de 2025",
-        #         "time": 
+        #         "time":
         #         "2:56:17 p. m."
         #     },
         #     "monitors": {
@@ -40,7 +39,7 @@ class VesToUsd:
 
         if response.status_code == 200:
             data = response.json()
-            rate = data['monitors']['enparalelovzla']['price']
+            rate = data["monitors"]["enparalelovzla"]["price"]
             return rate
         else:
             return None

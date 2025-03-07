@@ -12,25 +12,30 @@ from ..accounts.models import Account
 from japb_api.currencies.models import CurrencyConversionHistorial
 from .permissions import IsOwnerOrReadOnly, IsOwner
 from .models import Transaction, CurrencyExchange, Category
-from .serializers import \
-    TransactionSerializer,\
-    CurrencyExchangeSerializer,\
-    ExchangeComissionSerializer,\
-    CategorySerializer,\
-    TransactionFilterSet\
-    
-    
+from .serializers import (
+    TransactionSerializer,
+    CurrencyExchangeSerializer,
+    ExchangeComissionSerializer,
+    CategorySerializer,
+    TransactionFilterSet,
+)
+
+
 def parse_amount(amount, decimal_places):
-    return int(amount * (10 ** decimal_places))
+    return int(amount * (10**decimal_places))
+
 
 class TransactionViewSet(viewsets.ModelViewSet):
     queryset = Transaction.objects.all()
     serializer_class = TransactionSerializer
     filter_backends = (DjangoFilterBackend, filters.OrderingFilter)
     filterset_class = TransactionFilterSet
-    ordering_fields = ['date']
-    ordering = ['-date']
-    permission_classes = (IsAuthenticated, IsOwner,)
+    ordering_fields = ["date"]
+    ordering = ["-date"]
+    permission_classes = (
+        IsAuthenticated,
+        IsOwner,
+    )
 
     def get_queryset(self):
         return Transaction.objects.filter(user=self.request.user)
@@ -42,40 +47,49 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
         created_transactions = []
         for transaction_data in transactions_data:
-
             transaction_serializer = self.get_serializer(data=transaction_data)
-            account = Account.objects.get(pk=transaction_serializer.initial_data.get('account'))
+            account = Account.objects.get(
+                pk=transaction_serializer.initial_data.get("account")
+            )
 
-            amount = float(transaction_serializer.initial_data.get('amount'))
+            amount = float(transaction_serializer.initial_data.get("amount"))
             decimal_places = account.decimal_places
 
-            transaction_serializer.initial_data['amount'] = parse_amount(amount, decimal_places)
+            transaction_serializer.initial_data["amount"] = parse_amount(
+                amount, decimal_places
+            )
 
             # Get conversion for the transaction date
-            conversion = CurrencyConversionHistorial.objects.filter(
-                currency_from=account.currency,
-                currency_to__name='USD',
-                date__lte=transaction_serializer.initial_data.get('date')
-            ).order_by('-date').first()
-            
+            conversion = (
+                CurrencyConversionHistorial.objects.filter(
+                    currency_from=account.currency,
+                    currency_to__name="USD",
+                    date__lte=transaction_serializer.initial_data.get("date"),
+                )
+                .order_by("-date")
+                .first()
+            )
+
             if conversion:
-                transaction_serializer.initial_data['to_main_currency_amount'] = int(parse_amount(amount, 2) / conversion.rate)
-            
+                transaction_serializer.initial_data["to_main_currency_amount"] = int(
+                    parse_amount(amount, 2) / conversion.rate
+                )
 
             if transaction_serializer.is_valid():
                 transaction = transaction_serializer.save()
                 created_transactions.append(transaction_serializer.data)
                 update_reports.delay(transaction.account.id)
             else:
-                return Response(transaction_serializer.errors,
-                                status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    transaction_serializer.errors, status=status.HTTP_400_BAD_REQUEST
+                )
 
         return Response(created_transactions, status=status.HTTP_201_CREATED)
 
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
-    
-    def update(self, request, pk = None):
+
+    def update(self, request, pk=None):
         try:
             transaction = self.get_queryset().get(pk=pk)
         except Transaction.DoesNotExist:
@@ -83,101 +97,127 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(transaction, data=request.data, partial=True)
 
-        amount = float(serializer.initial_data.get('amount'))
-        decimal_places = Account.objects.get(pk=serializer.initial_data.get('account')).decimal_places
-        serializer.initial_data['amount'] = parse_amount(amount, decimal_places)
+        amount = float(serializer.initial_data.get("amount"))
+        decimal_places = Account.objects.get(
+            pk=serializer.initial_data.get("account")
+        ).decimal_places
+        serializer.initial_data["amount"] = parse_amount(amount, decimal_places)
 
         if serializer.is_valid():
             serializer.save()
-            update_reports.delay(transaction.account.id) 
+            update_reports.delay(transaction.account.id)
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
     def destroy(self, request, *args, **kwargs):
-        transaction_pk = self.get_queryset().get(pk=kwargs['pk'])
-        update_reports.delay(transaction_pk.account.id) 
+        transaction_pk = self.get_queryset().get(pk=kwargs["pk"])
+        update_reports.delay(transaction_pk.account.id)
         return super().destroy(request, *args, **kwargs)
-    
+
+
 class CurrencyExchangeViewSet(viewsets.ModelViewSet):
-    user = serializers.PrimaryKeyRelatedField(read_only=True, default=serializers.CurrentUserDefault())
+    user = serializers.PrimaryKeyRelatedField(
+        read_only=True, default=serializers.CurrentUserDefault()
+    )
     queryset = CurrencyExchange.objects.all()
     serializer_class = CurrencyExchangeSerializer
     filter_backends = (DjangoFilterBackend, filters.OrderingFilter)
     filterset_class = TransactionFilterSet
-    ordering_fields = ['date']
-    permission_classes = (IsAuthenticated, IsOwner,)
+    ordering_fields = ["date"]
+    permission_classes = (
+        IsAuthenticated,
+        IsOwner,
+    )
 
     def get_queryset(self):
         return CurrencyExchange.objects.filter(user=self.request.user)
 
     def create(self, request):
         try:
-            account_from = Account.objects.get(pk = request.data['from_account'])
-            account_to = Account.objects.get(pk = request.data['to_account']) 
+            account_from = Account.objects.get(pk=request.data["from_account"])
+            account_to = Account.objects.get(pk=request.data["to_account"])
         except Account.DoesNotExist:
-            return Response({ 'errors': { 'accounts': 'Invalid Accounts' } }, status = status.HTTP_400_BAD_REQUEST) 
+            return Response(
+                {"errors": {"accounts": "Invalid Accounts"}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        description = request.data.get('description', f'Exchange from {account_from.name} to {account_to.name}')
+        description = request.data.get(
+            "description", f"Exchange from {account_from.name} to {account_to.name}"
+        )
 
-        from_amount = float(request.data.get('from_amount'))
+        from_amount = float(request.data.get("from_amount"))
         from_decimal_places = account_from.decimal_places
-        request.data['from_amount'] = parse_amount(from_amount, from_decimal_places)
+        request.data["from_amount"] = parse_amount(from_amount, from_decimal_places)
 
-        to_amount = float(request.data.get('to_amount'))
+        to_amount = float(request.data.get("to_amount"))
         to_decimal_places = account_to.decimal_places
-        request.data['to_amount'] = parse_amount(to_amount, to_decimal_places)
+        request.data["to_amount"] = parse_amount(to_amount, to_decimal_places)
 
-        comission_amount = request.data['from_amount'] - request.data['to_amount']
+        comission_amount = request.data["from_amount"] - request.data["to_amount"]
 
         from_account_transaction_data = {
-            'amount': -float(request.data['from_amount']) - (-comission_amount if account_from.currency == account_to.currency else 0),
-            'account': request.data['from_account'],
-            'description': description,
-            'date': request.data['date'],
+            "amount": -float(request.data["from_amount"])
+            - (
+                -comission_amount if account_from.currency == account_to.currency else 0
+            ),
+            "account": request.data["from_account"],
+            "description": description,
+            "date": request.data["date"],
         }
         to_account_transaction_data = {
-            'amount': float(request.data['to_amount']),
-            'account': request.data['to_account'],
-            'description': description,
-            'date': request.data['date'],
+            "amount": float(request.data["to_amount"]),
+            "account": request.data["to_account"],
+            "description": description,
+            "date": request.data["date"],
         }
 
         # check if categories "Exchanges" and "Exchanges Income exists"
         try:
-            category_from = Category.objects.get(name = 'Exchanges')
-            category_to = Category.objects.get(name = 'Exchanges Income')
-            category_comission = Category.objects.get(name = 'Comissions')
+            category_from = Category.objects.get(name="Exchanges")
+            category_to = Category.objects.get(name="Exchanges Income")
+            category_comission = Category.objects.get(name="Comissions")
         except Category.DoesNotExist:
             category_from = None
             category_to = None
             category_comission = None
-        
+
         if category_from:
-            from_account_transaction_data['category'] = category_from.id
+            from_account_transaction_data["category"] = category_from.id
         if category_to:
-            to_account_transaction_data['category'] = category_to.id
+            to_account_transaction_data["category"] = category_to.id
 
         # check if the from_account and to_account are the same currency
         if account_from.currency == account_to.currency:
-            from_account_transaction_data['type'] = 'from_same_currency'
-            to_account_transaction_data['type'] = 'to_same_currency'
+            from_account_transaction_data["type"] = "from_same_currency"
+            to_account_transaction_data["type"] = "to_same_currency"
         else:
-            from_account_transaction_data['type'] = 'from_different_currency'
-            to_account_transaction_data['type'] = 'to_different_currency'
-            
-        transaction_from_serializer = self.get_serializer(data = from_account_transaction_data)
-        transaction_to_serializer = self.get_serializer(data = to_account_transaction_data)
+            from_account_transaction_data["type"] = "from_different_currency"
+            to_account_transaction_data["type"] = "to_different_currency"
+
+        transaction_from_serializer = self.get_serializer(
+            data=from_account_transaction_data
+        )
+        transaction_to_serializer = self.get_serializer(
+            data=to_account_transaction_data
+        )
 
         if transaction_from_serializer.is_valid():
             from_account_transaction = transaction_from_serializer.save()
         else:
-            return Response({ 'from_data': transaction_from_serializer.errors }, status = status.HTTP_400_BAD_REQUEST)
-        
+            return Response(
+                {"from_data": transaction_from_serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         if transaction_to_serializer.is_valid():
             to_account_transaction = transaction_to_serializer.save()
         else:
-            return Response({'to_data': transaction_to_serializer.errors}, status = status.HTTP_400_BAD_REQUEST)
-        
+            return Response(
+                {"to_data": transaction_to_serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         # Set the related_transaction field of the to_account_transaction
         to_account_transaction.related_transaction = from_account_transaction
         to_account_transaction.save()
@@ -193,40 +233,53 @@ class CurrencyExchangeViewSet(viewsets.ModelViewSet):
         # Create the comission transaction
         if account_from.currency == account_to.currency:
             comission_transaction_data = {
-                'amount': request.data['to_amount'] - request.data['from_amount'],
-                'account': request.data['from_account'],
-                'description': f'Comission for {description}',
-                'date': request.data['date'],
-                'type': 'comission' if request.data['from_amount'] >= request.data['to_amount'] else 'profit',
-                'exchange_from': from_account_transaction.id,
-                'exchange_to': to_account_transaction.id,
-                'user': request.user.id,
+                "amount": request.data["to_amount"] - request.data["from_amount"],
+                "account": request.data["from_account"],
+                "description": f"Comission for {description}",
+                "date": request.data["date"],
+                "type": "comission"
+                if request.data["from_amount"] >= request.data["to_amount"]
+                else "profit",
+                "exchange_from": from_account_transaction.id,
+                "exchange_to": to_account_transaction.id,
+                "user": request.user.id,
             }
             if category_comission:
-                comission_transaction_data['category'] = category_comission.id
+                comission_transaction_data["category"] = category_comission.id
 
-            comission_transaction_serializer = ExchangeComissionSerializer(data = comission_transaction_data)
+            comission_transaction_serializer = ExchangeComissionSerializer(
+                data=comission_transaction_data
+            )
 
             if comission_transaction_serializer.is_valid():
                 comission_transaction_serializer.save()
                 update_reports.delay(from_account_transaction.account.id)
-                update_reports.delay(to_account_transaction.account.id) 
+                update_reports.delay(to_account_transaction.account.id)
                 response.append(comission_transaction_serializer.data)
             else:
-                return Response({ 'comission_data': comission_transaction_serializer.errors }, status = status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {"comission_data": comission_transaction_serializer.errors},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-        return Response(response, status = status.HTTP_201_CREATED) 
-    
+        return Response(response, status=status.HTTP_201_CREATED)
+
+
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     filter_backends = (DjangoFilterBackend, filters.OrderingFilter)
-    ordering_fields = ['name']
-    permission_classes = (IsAuthenticated, IsOwnerOrReadOnly,)
+    ordering_fields = ["name"]
+    permission_classes = (
+        IsAuthenticated,
+        IsOwnerOrReadOnly,
+    )
 
     def get_queryset(self):
-        """ get global categories and user categories """
-        return Category.objects.filter(Q(user=self.request.user.id) | Q(user__isnull=True))
+        """get global categories and user categories"""
+        return Category.objects.filter(
+            Q(user=self.request.user.id) | Q(user__isnull=True)
+        )
 
     def create(self, request):
         categories_data = request.data
@@ -240,8 +293,9 @@ class CategoryViewSet(viewsets.ModelViewSet):
                 category = category_serializer.save()
                 created_categories.append(category_serializer.data)
             else:
-                return Response(category_serializer.errors,
-                                status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    category_serializer.errors, status=status.HTTP_400_BAD_REQUEST
+                )
 
         return Response(created_categories, status=status.HTTP_201_CREATED)
 
@@ -252,6 +306,6 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
-    
+
     def destroy(self, request, *args, **kwargs):
         return super().destroy(request, *args, **kwargs)

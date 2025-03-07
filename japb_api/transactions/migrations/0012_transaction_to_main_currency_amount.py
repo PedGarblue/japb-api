@@ -4,15 +4,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('transactions', '0011_currencyexchange_comissions'),
+        ("transactions", "0011_currencyexchange_comissions"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='transaction',
-            name='to_main_currency_amount',
+            model_name="transaction",
+            name="to_main_currency_amount",
             field=models.IntegerField(null=True),
         ),
     ]

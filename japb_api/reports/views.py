@@ -1,6 +1,11 @@
 from django.http import JsonResponse
 from .models import ReportAccount, ReportCurrency
-from .serializers import ReportAccountSerializer, ReportCurrencySerializer, ReportAccountFilterSet, ReportCurrencyFilterSet
+from .serializers import (
+    ReportAccountSerializer,
+    ReportCurrencySerializer,
+    ReportAccountFilterSet,
+    ReportCurrencyFilterSet,
+)
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -9,12 +14,16 @@ from rest_framework import status, viewsets, filters
 
 from japb_api.core.permissions import IsOwner
 
+
 class ReportAccountViewSet(viewsets.ModelViewSet):
     serializer_class = ReportAccountSerializer
     filter_backends = (DjangoFilterBackend, filters.OrderingFilter)
     filterset_class = ReportAccountFilterSet
-    ordering_fields = ['from_date']
-    permission_classes = (IsAuthenticated, IsOwner,)
+    ordering_fields = ["from_date"]
+    permission_classes = (
+        IsAuthenticated,
+        IsOwner,
+    )
 
     def get_queryset(self):
         return ReportAccount.objects.filter(user=self.request.user)
@@ -30,17 +39,14 @@ class ReportAccountViewSet(viewsets.ModelViewSet):
             if report_serializer.is_valid():
                 # calculate initial balance
                 report = report_serializer.save()
-                report.calculate_initial_balance()\
-                    .calculate_end_balance()\
-                    .calculate_total_income()\
-                    .calculate_total_expenses()\
-                
+                report.calculate_initial_balance().calculate_end_balance().calculate_total_income().calculate_total_expenses()
                 report.save()
 
                 created_reports.append(report_serializer.data)
             else:
-                return Response(report_serializer.errors,
-                                status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    report_serializer.errors, status=status.HTTP_400_BAD_REQUEST
+                )
 
         return Response(created_reports, status=status.HTTP_201_CREATED)
 
@@ -52,9 +58,9 @@ class ReportAccountViewSet(viewsets.ModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
 
-    def update(self, request, pk = None):
+    def update(self, request, pk=None):
         try:
-            report = self.get_queryset().get(pk = pk)
+            report = self.get_queryset().get(pk=pk)
         except ReportAccount.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -63,27 +69,26 @@ class ReportAccountViewSet(viewsets.ModelViewSet):
         if serializer.is_valid():
             # calculate initial balance
             report = serializer.save()
-            report.calculate_initial_balance()\
-                .calculate_end_balance()\
-                .calculate_total_income()\
-                .calculate_total_expenses()\
-            
+            report.calculate_initial_balance().calculate_end_balance().calculate_total_income().calculate_total_expenses()
             report.save()
 
             return Response(serializer.data)
         else:
-            return Response(serializer.errors,
-                            status=status.HTTP_400_BAD_REQUEST)
-    
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
     def destroy(self, request, *args, **kwargs):
         return super().destroy(request, *args, **kwargs)
+
 
 class ReportCurrencyViewSet(viewsets.ModelViewSet):
     serializer_class = ReportCurrencySerializer
     filter_backends = (DjangoFilterBackend, filters.OrderingFilter)
     filterset_class = ReportCurrencyFilterSet
-    ordering_fields = ['from_date']
-    permission_classes = (IsAuthenticated, IsOwner,)
+    ordering_fields = ["from_date"]
+    permission_classes = (
+        IsAuthenticated,
+        IsOwner,
+    )
 
     def get_queryset(self):
         return ReportCurrency.objects.filter(user=self.request.user)
@@ -99,17 +104,14 @@ class ReportCurrencyViewSet(viewsets.ModelViewSet):
             if report_serializer.is_valid():
                 # calculate initial balance
                 report = report_serializer.save()
-                report.calculate_initial_balance()\
-                    .calculate_end_balance()\
-                    .calculate_total_income()\
-                    .calculate_total_expenses()\
-                
+                report.calculate_initial_balance().calculate_end_balance().calculate_total_income().calculate_total_expenses()
                 report.save()
 
                 created_reports.append(report_serializer.data)
             else:
-                return Response(report_serializer.errors,
-                                status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    report_serializer.errors, status=status.HTTP_400_BAD_REQUEST
+                )
 
         return Response(created_reports, status=status.HTTP_201_CREATED)
 
@@ -121,9 +123,9 @@ class ReportCurrencyViewSet(viewsets.ModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
 
-    def update(self, request, pk = None):
+    def update(self, request, pk=None):
         try:
-            report = self.get_queryset().get(pk = pk)
+            report = self.get_queryset().get(pk=pk)
         except ReportCurrency.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -132,17 +134,12 @@ class ReportCurrencyViewSet(viewsets.ModelViewSet):
         if serializer.is_valid():
             # calculate initial balance
             report = serializer.save()
-            report.calculate_initial_balance()\
-                .calculate_end_balance()\
-                .calculate_total_income()\
-                .calculate_total_expenses()\
-            
+            report.calculate_initial_balance().calculate_end_balance().calculate_total_income().calculate_total_expenses()
             report.save()
 
             return Response(serializer.data)
         else:
-            return Response(serializer.errors,
-                            status=status.HTTP_400_BAD_REQUEST)
-    
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
     def destroy(self, request, *args, **kwargs):
         return super().destroy(request, *args, **kwargs)

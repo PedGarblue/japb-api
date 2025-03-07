@@ -4,10 +4,10 @@ from django.db import migrations, models
 from japb_api.transactions.models import CurrencyExchange, ExchangeComission
 from django.db.models import F, Subquery
 
-class Migration(migrations.Migration):
 
+class Migration(migrations.Migration):
     dependencies = [
-        ('transactions', '0010_category_user_transaction_user'),
+        ("transactions", "0010_category_user_transaction_user"),
     ]
 
     operations = [
@@ -35,6 +35,6 @@ class Migration(migrations.Migration):
                 #     exchange_from__type='from_same_currency',
                 #     exchange_from__amount__lt=-models.F('exchange_to__amount')
                 # ).delete()
-            ]
+            ],
         ),
     ]

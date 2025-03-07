@@ -1,7 +1,8 @@
 from django.apps import AppConfig
 
+
 class ReportsConfig(AppConfig):
-    name = 'japb_api.reports'
+    name = "japb_api.reports"
 
     def ready(self):
         pass

@@ -5,34 +5,47 @@ import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('currencies', '0003_currency_symbol'),
-        ('accounts', '0002_account_decimal_places'),
-        ('reports', '0001_initial'),
+        ("currencies", "0003_currency_symbol"),
+        ("accounts", "0002_account_decimal_places"),
+        ("reports", "0001_initial"),
     ]
 
     operations = [
         migrations.RenameModel(
-            old_name='Report',
-            new_name='ReportAccount',
+            old_name="Report",
+            new_name="ReportAccount",
         ),
         migrations.CreateModel(
-            name='ReportCurrency',
+            name="ReportCurrency",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('from_date', models.DateField()),
-                ('to_date', models.DateField()),
-                ('initial_balance', models.IntegerField(default=0)),
-                ('end_balance', models.IntegerField(default=0)),
-                ('total_income', models.IntegerField(default=0)),
-                ('total_expenses', models.IntegerField(default=0)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('currency', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='currencies.currency')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("from_date", models.DateField()),
+                ("to_date", models.DateField()),
+                ("initial_balance", models.IntegerField(default=0)),
+                ("end_balance", models.IntegerField(default=0)),
+                ("total_income", models.IntegerField(default=0)),
+                ("total_expenses", models.IntegerField(default=0)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "currency",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="currencies.currency",
+                    ),
+                ),
             ],
             options={
-                'abstract': False,
+                "abstract": False,
             },
         ),
     ]

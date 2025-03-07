@@ -11,9 +11,10 @@ class LoggedUserViewSet(viewsets.ViewSet):
     """
     ViewSet for logged user
     """
+
     permission_classes = (IsOwner,)
 
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=["get"])
     def me(self, request):
         """
         Returns the logged user
@@ -21,7 +22,7 @@ class LoggedUserViewSet(viewsets.ViewSet):
         serializer = UserSerializer(request.user)
         return Response(serializer.data)
 
-    @action(detail=False, methods=['patch'])
+    @action(detail=False, methods=["patch"])
     def update_me(self, request):
         """
         Updates the logged user
@@ -31,21 +32,24 @@ class LoggedUserViewSet(viewsets.ViewSet):
         serializer.save()
         return Response(serializer.data)
 
-class UserViewSet(mixins.RetrieveModelMixin,
-                  mixins.UpdateModelMixin,
-                  viewsets.GenericViewSet):
+
+class UserViewSet(
+    mixins.RetrieveModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet
+):
     """
     Updates and retrieves user accounts
     """
+
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = (IsOwnerOrAdmin,)
 
-class UserCreateViewSet(mixins.CreateModelMixin,
-                        viewsets.GenericViewSet):
+
+class UserCreateViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
     """
     Creates user accounts
     """
+
     queryset = User.objects.all()
     serializer_class = CreateUserSerializer
     permission_classes = (AllowAny,)

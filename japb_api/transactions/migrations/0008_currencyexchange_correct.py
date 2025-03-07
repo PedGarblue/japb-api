@@ -5,9 +5,8 @@ from japb_api.transactions.models import CurrencyExchange
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('transactions', '0007_currencyexchange_correct'),
+        ("transactions", "0007_currencyexchange_correct"),
     ]
 
     operations = [
@@ -16,37 +15,41 @@ class Migration(migrations.Migration):
             # and the account currency is the same as the
             # related_transaction account currency, then the type is from_same_currency
             code=lambda apps, schema_editor: CurrencyExchange.objects.filter(
-                related_transaction__id__gt=models.F('id'),
-                account__currency=models.F('related_transaction__account__currency')
-            ).update(type='from_same_currency'),
+                related_transaction__id__gt=models.F("id"),
+                account__currency=models.F("related_transaction__account__currency"),
+            ).update(type="from_same_currency"),
         ),
         migrations.RunPython(
             # if related_transaction id is lesser than exchange id
             # and the account currency is the same as the
             # related_transaction account currency, then the type is to_same_currency
             code=lambda apps, schema_editor: CurrencyExchange.objects.filter(
-                related_transaction__id__lt=models.F('id'),
-                account__currency=models.F('related_transaction__account__currency')
-            ).update(type='to_same_currency'),
+                related_transaction__id__lt=models.F("id"),
+                account__currency=models.F("related_transaction__account__currency"),
+            ).update(type="to_same_currency"),
         ),
         migrations.RunPython(
             # if related_transaction id is greater than exchange id
             # and the account currency is different from the
             # related_transaction account currency, then the type is from_different_currency
             code=lambda apps, schema_editor: CurrencyExchange.objects.filter(
-                related_transaction__id__gt=models.F('id'),
+                related_transaction__id__gt=models.F("id"),
             )
-            .exclude(account__currency=models.F('related_transaction__account__currency'))
-            .update(type='from_different_currency'),
+            .exclude(
+                account__currency=models.F("related_transaction__account__currency")
+            )
+            .update(type="from_different_currency"),
         ),
         migrations.RunPython(
             # if related_transaction id is lesser than exchange id
             # and the account currency is different from the
             # related_transaction account currency, then the type is to_different_currency
             code=lambda apps, schema_editor: CurrencyExchange.objects.filter(
-                related_transaction__id__lt=models.F('id'),
+                related_transaction__id__lt=models.F("id"),
             )
-            .exclude(account__currency=models.F('related_transaction__account__currency'))
-            .update(type='to_different_currency'),
+            .exclude(
+                account__currency=models.F("related_transaction__account__currency")
+            )
+            .update(type="to_different_currency"),
         ),
     ]

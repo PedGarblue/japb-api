@@ -6,8 +6,9 @@ from japb_api.currencies.models import Currency
 from japb_api.accounts.models import Account
 from japb_api.transactions.models import Transaction, CurrencyExchange
 
+
 class Report(models.Model):
-    user = models.ForeignKey('users.User', null=True, on_delete=models.CASCADE)
+    user = models.ForeignKey("users.User", null=True, on_delete=models.CASCADE)
     from_date = models.DateField()
     to_date = models.DateField()
     # balances are stored as integers just like transactions
@@ -22,109 +23,159 @@ class Report(models.Model):
         abstract = True
 
     def get_from_date(self) -> datetime:
-        return datetime(year=self.from_date.year, month=self.from_date.month, day=self.from_date.day, hour=0, minute=0, second=0, microsecond=0)
+        return datetime(
+            year=self.from_date.year,
+            month=self.from_date.month,
+            day=self.from_date.day,
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
 
     def get_to_date(self) -> datetime:
-        return datetime(year=self.to_date.year, month=self.to_date.month, day=self.to_date.day, hour=23, minute=59, second=59, microsecond=999999)
-        
+        return datetime(
+            year=self.to_date.year,
+            month=self.to_date.month,
+            day=self.to_date.day,
+            hour=23,
+            minute=59,
+            second=59,
+            microsecond=999999,
+        )
+
     def get_from_date_with_timezone(self) -> datetime:
         return timezone.make_aware(self.get_from_date())
 
     def get_to_date_with_timezone(self) -> datetime:
         return timezone.make_aware(self.get_to_date())
 
+
 class ReportAccount(Report):
     account = models.ForeignKey(Account, on_delete=models.CASCADE)
 
-    def get_transactions_queryset(self) -> QuerySet['Transaction']:
-        return Transaction.objects.filter(user=self.user, account=self.account,)
+    def get_transactions_queryset(self) -> QuerySet["Transaction"]:
+        return Transaction.objects.filter(
+            user=self.user,
+            account=self.account,
+        )
 
-    def calculate_initial_balance(self) -> 'ReportAccount':
-        transactions = self.get_transactions_queryset().filter(date__lt=self.get_from_date_with_timezone())
-        transactions_sum = transactions.aggregate(models.Sum('amount'))['amount__sum']
+    def calculate_initial_balance(self) -> "ReportAccount":
+        transactions = self.get_transactions_queryset().filter(
+            date__lt=self.get_from_date_with_timezone()
+        )
+        transactions_sum = transactions.aggregate(models.Sum("amount"))["amount__sum"]
         self.initial_balance = transactions_sum if transactions_sum else 0
         return self
 
-    def calculate_end_balance(self) -> 'ReportAccount':
-        transactions = self.get_transactions_queryset().filter(date__lte=self.get_to_date_with_timezone())
-        transactions_sum = transactions.aggregate(models.Sum('amount'))['amount__sum']
+    def calculate_end_balance(self) -> "ReportAccount":
+        transactions = self.get_transactions_queryset().filter(
+            date__lte=self.get_to_date_with_timezone()
+        )
+        transactions_sum = transactions.aggregate(models.Sum("amount"))["amount__sum"]
         self.end_balance = transactions_sum if transactions_sum else 0
         return self
 
-    def calculate_total_income(self) -> 'ReportAccount':
-        transactions = self.get_transactions_queryset().filter(date__range=[self.get_from_date_with_timezone(), self.get_to_date_with_timezone()], amount__gt=0)
-        transactions_sum = transactions.aggregate(models.Sum('amount'))['amount__sum']
+    def calculate_total_income(self) -> "ReportAccount":
+        transactions = self.get_transactions_queryset().filter(
+            date__range=[
+                self.get_from_date_with_timezone(),
+                self.get_to_date_with_timezone(),
+            ],
+            amount__gt=0,
+        )
+        transactions_sum = transactions.aggregate(models.Sum("amount"))["amount__sum"]
         self.total_income = transactions_sum if transactions_sum else 0
         return self
-    
-    def calculate_total_expenses(self) -> 'ReportAccount':
-        transactions = self.get_transactions_queryset().filter(date__range=[self.get_from_date_with_timezone(), self.get_to_date_with_timezone()], amount__lt=0)
-        transactions_sum = transactions.aggregate(models.Sum('amount'))['amount__sum']
+
+    def calculate_total_expenses(self) -> "ReportAccount":
+        transactions = self.get_transactions_queryset().filter(
+            date__range=[
+                self.get_from_date_with_timezone(),
+                self.get_to_date_with_timezone(),
+            ],
+            amount__lt=0,
+        )
+        transactions_sum = transactions.aggregate(models.Sum("amount"))["amount__sum"]
         self.total_expenses = transactions_sum if transactions_sum else 0
         return self
+
 
 class ReportCurrency(Report):
     currency = models.ForeignKey(Currency, on_delete=models.CASCADE)
 
-    def get_account_reports_in_month_range(self) -> QuerySet['ReportAccount']:
+    def get_account_reports_in_month_range(self) -> QuerySet["ReportAccount"]:
         return ReportAccount.objects.filter(
-            user = self.user,
+            user=self.user,
             account__currency=self.currency,
-            from_date__range=[self.get_from_date_with_timezone(), self.get_to_date_with_timezone()]
-        )
-    
-    def get_transactions_in_month_range(self) -> QuerySet['Transaction']:
-        return Transaction.objects.filter(
-            user = self.user,
-            account__currency=self.currency,
-            date__range=[self.get_from_date_with_timezone(), self.get_to_date_with_timezone()]
-        )
-    
-    def get_exchanges_in_month_range(self) -> QuerySet['CurrencyExchange']:
-        return CurrencyExchange.objects.filter(
-            user = self.user,
-            account__currency=self.currency,
-            date__range=[self.get_from_date_with_timezone(), self.get_to_date_with_timezone()]
+            from_date__range=[
+                self.get_from_date_with_timezone(),
+                self.get_to_date_with_timezone(),
+            ],
         )
 
-    def calculate_initial_balance(self) -> 'ReportCurrency':
+    def get_transactions_in_month_range(self) -> QuerySet["Transaction"]:
+        return Transaction.objects.filter(
+            user=self.user,
+            account__currency=self.currency,
+            date__range=[
+                self.get_from_date_with_timezone(),
+                self.get_to_date_with_timezone(),
+            ],
+        )
+
+    def get_exchanges_in_month_range(self) -> QuerySet["CurrencyExchange"]:
+        return CurrencyExchange.objects.filter(
+            user=self.user,
+            account__currency=self.currency,
+            date__range=[
+                self.get_from_date_with_timezone(),
+                self.get_to_date_with_timezone(),
+            ],
+        )
+
+    def calculate_initial_balance(self) -> "ReportCurrency":
         reports = self.get_account_reports_in_month_range()
-        reports_sum = reports.aggregate(models.Sum('initial_balance'))['initial_balance__sum']
+        reports_sum = reports.aggregate(models.Sum("initial_balance"))[
+            "initial_balance__sum"
+        ]
         self.initial_balance = reports_sum if reports_sum else 0
         return self
 
-    def calculate_end_balance(self) -> 'ReportCurrency':
+    def calculate_end_balance(self) -> "ReportCurrency":
         reports = self.get_account_reports_in_month_range()
-        reports_sum = reports.aggregate(models.Sum('end_balance'))['end_balance__sum']
+        reports_sum = reports.aggregate(models.Sum("end_balance"))["end_balance__sum"]
         self.end_balance = reports_sum if reports_sum else 0
         return self
 
-    def calculate_total_income(self) -> 'ReportCurrency':
-        exchanges_income_from_same_currency = self.get_exchanges_in_month_range()\
-            .filter(
-                type = 'to_same_currency',
+    def calculate_total_income(self) -> "ReportCurrency":
+        exchanges_income_from_same_currency = (
+            self.get_exchanges_in_month_range().filter(
+                type="to_same_currency",
             )
-        transactions = self.get_transactions_in_month_range()\
-            .filter(
-                amount__gt=0
-            )\
+        )
+        transactions = (
+            self.get_transactions_in_month_range()
+            .filter(amount__gt=0)
             .exclude(id__in=exchanges_income_from_same_currency)
-        transactions_sum = transactions.aggregate(models.Sum('amount'))['amount__sum']
+        )
+        transactions_sum = transactions.aggregate(models.Sum("amount"))["amount__sum"]
         self.total_income = transactions_sum if transactions_sum else 0
         return self
-    
-    def calculate_total_expenses(self) -> 'ReportCurrency':
-        exchanges_expense_from_same_currency = self.get_exchanges_in_month_range()\
-            .filter(
-                type = 'from_same_currency',
-            )
 
-        transactions = self.get_transactions_in_month_range()\
-            .filter(
-                amount__lt=0
-            )\
+    def calculate_total_expenses(self) -> "ReportCurrency":
+        exchanges_expense_from_same_currency = (
+            self.get_exchanges_in_month_range().filter(
+                type="from_same_currency",
+            )
+        )
+
+        transactions = (
+            self.get_transactions_in_month_range()
+            .filter(amount__lt=0)
             .exclude(id__in=exchanges_expense_from_same_currency)
-        transactions_sum = transactions.aggregate(models.Sum('amount'))['amount__sum']
+        )
+        transactions_sum = transactions.aggregate(models.Sum("amount"))["amount__sum"]
 
         self.total_expenses = transactions_sum if transactions_sum else 0
         return self

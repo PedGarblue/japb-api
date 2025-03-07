@@ -5,51 +5,70 @@ from rest_framework.permissions import IsAuthenticated
 
 from japb_api.core.permissions import IsOwner
 from .models import Product, ProductList, ProductListItem
-from .serializers import ProductSerializer,\
-    ProductListSerializer,\
-    ProductListItemSerializer,\
-    ProductFilterSet,\
-    ProductListFilterSet,\
-    ProductListItemFilterSet\
+from .serializers import (
+    ProductSerializer,
+    ProductListSerializer,
+    ProductListItemSerializer,
+    ProductFilterSet,
+    ProductListFilterSet,
+    ProductListItemFilterSet,
+)
 
 
 class ProductsViewSet(viewsets.ModelViewSet):
     serializer_class = ProductSerializer
-    permission_classes = (IsAuthenticated, IsOwner,)
-    filter_backends = (DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter)
-    ordering_fields = ['category', 'cost', 'created_at', 'updated_at']
+    permission_classes = (
+        IsAuthenticated,
+        IsOwner,
+    )
+    filter_backends = (
+        DjangoFilterBackend,
+        filters.OrderingFilter,
+        filters.SearchFilter,
+    )
+    ordering_fields = ["category", "cost", "created_at", "updated_at"]
     filterset_class = ProductFilterSet
-    ordering = ['-category']
-    search_fields = ['name', 'description']
+    ordering = ["-category"]
+    search_fields = ["name", "description"]
 
     def get_queryset(self):
         return Product.objects.filter(user=self.request.user)
 
+
 class ProductsListViewSet(viewsets.ModelViewSet):
     serializer_class = ProductListSerializer
-    permission_classes = (IsAuthenticated, IsOwner,)
+    permission_classes = (
+        IsAuthenticated,
+        IsOwner,
+    )
     filter_backends = (DjangoFilterBackend, filters.OrderingFilter)
-    ordering_fields = ['created_at', 'updated_at']
+    ordering_fields = ["created_at", "updated_at"]
     filterset_class = ProductListFilterSet
-    ordering = ['-updated_at']
+    ordering = ["-updated_at"]
 
     def get_queryset(self):
         return ProductList.objects.filter(user=self.request.user)
 
+
 class ProductListItemViewSet(viewsets.ModelViewSet):
     serializer_class = ProductListItemSerializer
-    permission_classes = (IsAuthenticated, IsOwner,)
+    permission_classes = (
+        IsAuthenticated,
+        IsOwner,
+    )
     filter_backends = (DjangoFilterBackend, filters.OrderingFilter)
     filterset_class = ProductListItemFilterSet
-    ordering_fields = ['total', 'product__category', 'created_at', 'updated_at']
-    ordering = ['-product__category']
+    ordering_fields = ["total", "product__category", "created_at", "updated_at"]
+    ordering = ["-product__category"]
 
     def get_queryset(self):
-        return ProductListItem.objects.filter(user=self.request.user)\
-        .annotate(
-            total = models.ExpressionWrapper(
-                models.F('quantity') * models.F('product__cost'),
-                output_field = models.DecimalField()
+        return (
+            ProductListItem.objects.filter(user=self.request.user)
+            .annotate(
+                total=models.ExpressionWrapper(
+                    models.F("quantity") * models.F("product__cost"),
+                    output_field=models.DecimalField(),
+                )
             )
-        ).all()
-
+            .all()
+        )

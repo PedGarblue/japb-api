@@ -2,30 +2,32 @@
 
 from django.db import migrations, models
 
+
 def convert_amount(apps, schema_editor):
-    Transaction = apps.get_model('transactions', 'Transaction')
+    Transaction = apps.get_model("transactions", "Transaction")
     for transaction in Transaction.objects.all():
         # 2 decimal places
         transaction.amount = int(transaction.amount * 100)
         transaction.save()
 
+
 def revert_amount(apps, schema_editor):
-    Transaction = apps.get_model('transactions', 'Transaction')
+    Transaction = apps.get_model("transactions", "Transaction")
     for transaction in Transaction.objects.all():
         transaction.amount = float(transaction.amount / 100)
         transaction.save()
 
-class Migration(migrations.Migration):
 
+class Migration(migrations.Migration):
     dependencies = [
-        ('transactions', '0001_initial'),
+        ("transactions", "0001_initial"),
     ]
 
     operations = [
         migrations.RunPython(convert_amount, revert_amount),
         migrations.AlterField(
-            model_name='transaction',
-            name='amount',
+            model_name="transaction",
+            name="amount",
             field=models.IntegerField(),
         ),
     ]

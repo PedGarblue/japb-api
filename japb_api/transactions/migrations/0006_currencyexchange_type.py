@@ -4,15 +4,23 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('transactions', '0005_category_type'),
+        ("transactions", "0005_category_type"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='currencyexchange',
-            name='type',
-            field=models.CharField(choices=[('from_same_currency', 'from_same_currency'), ('from_different_currency', 'from_different_currency'), ('to_same_currency', 'to_same_currency'), ('to_different_currency', 'to_different_currency')], default='from_same_currency', max_length=50),
+            model_name="currencyexchange",
+            name="type",
+            field=models.CharField(
+                choices=[
+                    ("from_same_currency", "from_same_currency"),
+                    ("from_different_currency", "from_different_currency"),
+                    ("to_same_currency", "to_same_currency"),
+                    ("to_different_currency", "to_different_currency"),
+                ],
+                default="from_same_currency",
+                max_length=50,
+            ),
         ),
     ]

@@ -4,15 +4,18 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('transactions', '0004_transaction_category'),
+        ("transactions", "0004_transaction_category"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='category',
-            name='type',
-            field=models.CharField(choices=[('expense', 'expense'), ('income', 'income')], default='expense', max_length=50),
+            model_name="category",
+            name="type",
+            field=models.CharField(
+                choices=[("expense", "expense"), ("income", "income")],
+                default="expense",
+                max_length=50,
+            ),
         ),
     ]
