@@ -14,8 +14,11 @@ def update_reports(account_pk):
         .order_by("-to_date")
         .first()
     )
-    report.calculate_initial_balance().calculate_end_balance().calculate_total_income().calculate_total_expenses()
-    report.save()
+    report.calculate_initial_balance()\
+        .calculate_end_balance()\
+        .calculate_total_income()\
+        .calculate_total_expenses()\
+        .save()
 
     # get most recent report
     currency_report = (
@@ -24,7 +27,10 @@ def update_reports(account_pk):
         .first()
     )
 
-    currency_report.calculate_initial_balance().calculate_end_balance().calculate_total_income().calculate_total_expenses()
-    currency_report.save()
+    currency_report.calculate_initial_balance()\
+        .calculate_end_balance()\
+        .calculate_total_income()\
+        .calculate_total_expenses()\
+        .save()
 
     print("Reports updated")

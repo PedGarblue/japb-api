@@ -1,9 +1,7 @@
 from .models import Currency
 from .serializers import CurrencySerializer
-from rest_framework import viewsets
-from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets, filters
-
+from django_filters.rest_framework import DjangoFilterBackend
 from japb_api.core.permissions import IsAdminOrReadOnly
 
 

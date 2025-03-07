@@ -1,6 +1,6 @@
 import pytz
 from faker import Faker
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -14,7 +14,7 @@ from japb_api.currencies.factories import (
     CurrencyFactory,
     CurrencyConversionHistorialFactory,
 )
-from japb_api.currencies.models import Currency, CurrencyConversionHistorial
+from japb_api.currencies.models import Currency
 
 
 class TestCurrencyTransaction(APITestCase):

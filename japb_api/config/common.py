@@ -3,9 +3,9 @@ from os.path import join
 from distutils.util import strtobool
 import dj_database_url
 from configurations import Configuration
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 from datetime import timedelta
 
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 class Common(Configuration):
 
@@ -22,7 +22,7 @@ class Common(Configuration):
         'rest_framework',            # utilities for rest apis
         'rest_framework_simplejwt',  # jwt authentication
         'django_filters',            # for filtering rest endpoints
-        'corsheaders',            # Cross Origin headers 
+        'corsheaders',               # Cross Origin headers
 
         # Your apps
         'japb_api.core',
@@ -215,7 +215,7 @@ class Common(Configuration):
         'DEFAULT_AUTHENTICATION_CLASSES': (
             'rest_framework_simplejwt.authentication.JWTAuthentication',
         )
-    } 
+    }
 
     SIMPLE_JWT = {
         'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),

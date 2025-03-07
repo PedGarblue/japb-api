@@ -6,7 +6,8 @@ from japb_api.currencies.models import Currency, CurrencyConversionHistorial
 
 
 # Serializer for the Account model.
-# It includes a calculated field balance which is not part of the model, and is returned by the get_balance function.
+# It includes a calculated field balance which is not part of the model,
+# and is returned by the get_balance function.
 class AccountSerializer(serializers.ModelSerializer):
     balance = serializers.SerializerMethodField()
     balance_as_main_currency = serializers.SerializerMethodField()
@@ -39,9 +40,10 @@ class AccountSerializer(serializers.ModelSerializer):
         else:
             return None
 
-    # The get_balance method calculates the balance of the account using all currency transactions associated with it.
-    # It filters the CurrencyTransaction model for transactions with the current account's id, sums their amounts
-    # using the aggregate method, and returns the balance.
+    # The get_balance method calculates the balance of the account
+    # using all currency transactions associated with it.
+    # It filters the CurrencyTransaction model for transactions with the current account's id,
+    # sums their amounts using the aggregate method, and returns the balance.
     def get_balance(self, account):
         queryset = Transaction.objects.filter(account=account.id, user=account.user)
         amount_sum = queryset.aggregate(total=Sum("amount", default=0))["total"]

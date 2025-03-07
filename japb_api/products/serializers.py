@@ -2,7 +2,6 @@ import django_filters
 from django.db import models
 from rest_framework import serializers
 from .models import Product, ProductList, ProductListItem
-from japb_api.transactions.models import Category
 
 
 class ProductSerializer(serializers.ModelSerializer):

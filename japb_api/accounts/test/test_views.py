@@ -7,7 +7,6 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from japb_api.users.factories import UserFactory
 from japb_api.currencies.models import Currency
-from japb_api.transactions.models import Transaction
 from japb_api.transactions.factories import TransactionFactory
 from ..models import Account
 
@@ -55,7 +54,7 @@ class TestAccountsViews(APITestCase):
 
     def test_api_get_accounts(self):
         nonuser = UserFactory()
-        nonuserAccount = Account.objects.create(
+        Account.objects.create(
             name="Non User Account", currency=self.currency, user=nonuser
         )
 

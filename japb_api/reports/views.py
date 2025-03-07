@@ -1,4 +1,3 @@
-from django.http import JsonResponse
 from .models import ReportAccount, ReportCurrency
 from .serializers import (
     ReportAccountSerializer,
@@ -7,9 +6,8 @@ from .serializers import (
     ReportCurrencyFilterSet,
 )
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from rest_framework import status, viewsets, filters
 
 from japb_api.core.permissions import IsOwner
@@ -39,8 +37,11 @@ class ReportAccountViewSet(viewsets.ModelViewSet):
             if report_serializer.is_valid():
                 # calculate initial balance
                 report = report_serializer.save()
-                report.calculate_initial_balance().calculate_end_balance().calculate_total_income().calculate_total_expenses()
-                report.save()
+                report.calculate_initial_balance()\
+                    .calculate_end_balance()\
+                    .calculate_total_income()\
+                    .calculate_total_expenses()\
+                    .save()
 
                 created_reports.append(report_serializer.data)
             else:
@@ -69,8 +70,11 @@ class ReportAccountViewSet(viewsets.ModelViewSet):
         if serializer.is_valid():
             # calculate initial balance
             report = serializer.save()
-            report.calculate_initial_balance().calculate_end_balance().calculate_total_income().calculate_total_expenses()
-            report.save()
+            report.calculate_initial_balance()\
+                .calculate_end_balance()\
+                .calculate_total_income()\
+                .calculate_total_expenses()\
+                .save()
 
             return Response(serializer.data)
         else:
@@ -104,8 +108,11 @@ class ReportCurrencyViewSet(viewsets.ModelViewSet):
             if report_serializer.is_valid():
                 # calculate initial balance
                 report = report_serializer.save()
-                report.calculate_initial_balance().calculate_end_balance().calculate_total_income().calculate_total_expenses()
-                report.save()
+                report.calculate_initial_balance()\
+                    .calculate_end_balance()\
+                    .calculate_total_income()\
+                    .calculate_total_expenses()\
+                    .save()
 
                 created_reports.append(report_serializer.data)
             else:
@@ -134,8 +141,11 @@ class ReportCurrencyViewSet(viewsets.ModelViewSet):
         if serializer.is_valid():
             # calculate initial balance
             report = serializer.save()
-            report.calculate_initial_balance().calculate_end_balance().calculate_total_income().calculate_total_expenses()
-            report.save()
+            report.calculate_initial_balance()\
+                .calculate_end_balance()\
+                .calculate_total_income()\
+                .calculate_total_expenses()\
+                .save()
 
             return Response(serializer.data)
         else:

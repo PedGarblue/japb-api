@@ -1,5 +1,4 @@
 import pytz
-from django.db import models
 from datetime import datetime
 from datetime import date
 from django.test import TestCase
@@ -11,7 +10,6 @@ from japb_api.transactions.models import Transaction
 from japb_api.transactions.factories import TransactionFactory, CurrencyExchangeFactory
 from japb_api.reports.models import ReportAccount, ReportCurrency
 from japb_api.reports.factories import ReportAccountFactory, ReportCurrencyFactory
-from japb_api.reports.serializers import ReportAccountSerializer
 
 
 class TestReportAccountModel(TestCase):

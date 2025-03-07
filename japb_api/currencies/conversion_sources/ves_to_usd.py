@@ -1,6 +1,4 @@
 import requests
-from japb_api.currencies.models import CurrencyConversionHistorial
-
 
 class VesToUsd:
     def getLatestRate():
@@ -24,7 +22,7 @@ class VesToUsd:
         #         "enparalelovzla": {
         #             "change": 0.23,
         #             "color": "green",
-        #             "image": "https://res.cloudinary.com/dcpyfqx87/image/upload/v1721329079/enparalelovzla/jmdvqvnopoobzmdszno3.png",
+        #             "image": "https://res.cloudinary.com/dcpyfqx87...",
         #             "last_update": "2025-01-10T13:32:56-04:00",
         #             "percent": 0.34,
         #             "price": 68.23,

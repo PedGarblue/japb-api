@@ -54,7 +54,7 @@ class TestCurrencyViews(APITestCase):
         self.assertEqual(response.json()["results"][0]["symbol"], currency.symbol)
 
     """
-    Returns balance of a currency 
+    Returns balance of a currency
     """
 
     def test_api_get_currency_list_with_balance(self):

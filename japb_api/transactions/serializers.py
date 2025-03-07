@@ -1,8 +1,6 @@
 import django_filters
-from django.db.models import F
 from rest_framework import serializers
 from .models import Transaction, CurrencyExchange, ExchangeComission, Category
-from japb_api.currencies.models import Currency, CurrencyConversionHistorial
 from japb_api.accounts.models import Account
 
 

@@ -1,4 +1,3 @@
-from django.db.models import Sum
 from rest_framework import serializers
 from .models import Currency, CurrencyConversionHistorial
 from japb_api.accounts.models import Account

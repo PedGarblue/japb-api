@@ -63,7 +63,6 @@ class TestReceivableViews(APITestCase):
         self.assertEqual(Receivable.objects.get().status, "UNPAID")
 
     def test_api_get_receivables(self):
-        receivable = Receivable.objects.get()
         url = reverse("receivables-list")
         response = self.client.get(url)
 

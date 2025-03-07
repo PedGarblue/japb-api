@@ -1,14 +1,10 @@
-import datetime
-import calendar
 from datetime import datetime, timedelta
 import calendar
-from django.utils import timezone
 
 from japb_api.users.models import User
 from japb_api.reports.models import ReportAccount, ReportCurrency
 from japb_api.accounts.models import Account
 from japb_api.currencies.models import Currency
-from japb_api.transactions.models import Transaction, CurrencyExchange
 from japb_api.celery import app
 
 
@@ -50,7 +46,11 @@ def update_reports_of_account(account):
                 report_account.exclude(pk=report_account.first().pk).delete()
             report_account = report_account.first()
 
-        report_account.calculate_initial_balance().calculate_end_balance().calculate_total_income().calculate_total_expenses().save()
+        report_account.calculate_initial_balance()\
+            .calculate_end_balance()\
+            .calculate_total_income()\
+            .calculate_total_expenses()\
+            .save()
 
 
 def update_reports_of_currency(currency, user):
@@ -73,7 +73,11 @@ def update_reports_of_currency(currency, user):
                 report_currency.exclude(pk=report_currency.first().pk).delete()
             report_currency = report_currency.first()
 
-        report_currency.calculate_initial_balance().calculate_end_balance().calculate_total_income().calculate_total_expenses().save()
+        report_currency.calculate_initial_balance()\
+            .calculate_end_balance()\
+            .calculate_total_income()\
+            .calculate_total_expenses()\
+            .save()
 
 
 def update_account_reports():

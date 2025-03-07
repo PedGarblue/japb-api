@@ -1,4 +1,3 @@
-from datetime import date
 from faker import Faker
 from django.urls import reverse
 from rest_framework import status
