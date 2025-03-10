@@ -133,3 +133,40 @@ class TestProducts(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 0)
+
+    def test_api_can_filter_products_by_category(self):
+        category1 = Category.objects.create(name="Category 1", description="First Category")
+        category2 = Category.objects.create(name="Category 2", description="Second Category")
+
+        Product.objects.create(
+            name="Product 1",
+            description="Desc 1",
+            cost=100,
+            category=category1,
+            user=self.user,
+        )
+        Product.objects.create(
+            name="Product 2",
+            description="Desc 2",
+            cost=200,
+            category=category2,
+            user=self.user,
+        )
+
+        url = reverse("products-list") + f"?category={category1.id}"
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(response.data["results"][0]["name"], "Product 1")
+
+    def test_api_can_filter_products_by_price(self):
+        Product.objects.create(name="Cheap Product", description="Cheap", cost=50, user=self.user)
+        Product.objects.create(name="Expensive Product", description="Expensive", cost=150, user=self.user)
+
+        url = reverse("products-list") + "?min_price=100&max_price=200"
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(response.data["results"][0]["name"], "Expensive Product")

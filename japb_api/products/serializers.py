@@ -1,6 +1,7 @@
 import django_filters
 from django.db import models
 from rest_framework import serializers
+from japb_api.transactions.models import Category
 from .models import Product, ProductList, ProductListItem
 
 
@@ -86,7 +87,9 @@ class ProductFilterSet(django_filters.FilterSet):
     name = django_filters.CharFilter(lookup_expr="icontains")
     description = django_filters.CharFilter(lookup_expr="icontains")
     status = django_filters.CharFilter(lookup_expr="icontains")
-    category = django_filters.NumberFilter(field_name="category", lookup_expr="exact")
+    category = django_filters.ModelChoiceFilter(queryset=Category.objects.all())
+    min_price = django_filters.NumberFilter(field_name="cost", lookup_expr="gte")
+    max_price = django_filters.NumberFilter(field_name="cost", lookup_expr="lte")
 
     class Meta:
         model = Product
