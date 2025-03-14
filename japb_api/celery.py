@@ -27,4 +27,9 @@ app.conf.beat_schedule = {
         # 9:30 VET (13:30 UTC) and 13:30 VET (17:30 UTC)
         'schedule': crontab(minute=30, hour='13,17'),
     },
+    'renew_product_lists': {
+        'task': 'japb_api.products.tasks.renew_product_lists',
+        # every first day of the month at 00:00
+        'schedule': crontab(minute=0, hour=0),
+    },
 }
