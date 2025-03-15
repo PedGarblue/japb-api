@@ -6,7 +6,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from ..models import Transaction, CurrencyExchange, ExchangeComission, Category
+from ..models import Transaction, CurrencyExchange, ExchangeComission, Category, TransactionItem
 from ..factories import TransactionFactory, CategoryFactory
 from japb_api.users.models import User
 from japb_api.accounts.models import Account
@@ -15,6 +15,7 @@ from japb_api.currencies.factories import (
     CurrencyConversionHistorialFactory,
 )
 from japb_api.currencies.models import Currency
+from japb_api.products.models import Product
 
 
 class TestCurrencyTransaction(APITestCase):
@@ -71,6 +72,11 @@ class TestCurrencyTransaction(APITestCase):
             reverse("transactions-list"), self.data, format="json"
         )
 
+        # Create a product for testing transaction items
+        self.product = Product.objects.create(
+            name="Test Product",
+        )
+
     def test_api_create_transaction(self):
         self.assertEqual(self.response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Transaction.objects.count(), 1)
@@ -120,6 +126,30 @@ class TestCurrencyTransaction(APITestCase):
         self.assertEqual(self.response.json()[0]["amount"], "-50.00")
         # 3 + the one created at setUp()
         self.assertEqual(Transaction.objects.count(), 4)
+
+    def test_api_create_transaction_with_transaction_items(self):
+        Transaction.objects.all().delete()
+        TransactionItem.objects.all().delete()
+
+        data = {
+            "amount": -50,
+            "description": "Purchase",
+            "account": self.account.id,
+            "date": datetime.now(tz=timezone.utc),
+            "category": self.category.id,
+            "transaction_items": [
+                {
+                    "product": self.product.id,
+                    "quantity": 1,
+                }
+            ],
+        }
+
+        response = self.client.post(reverse("transactions-list"), data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Transaction.objects.count(), 1)
+        self.assertEqual(TransactionItem.objects.count(), 1)
 
     def test_api_get_user_transactions(self):
         # non user transaction
@@ -667,7 +697,6 @@ class TestCurrencyTransaction(APITestCase):
         self.assertEqual(response_from.category, category_exchanges)
         self.assertEqual(response_to.category, category_ex_income)
 
-    # should delete the 2 transactions created
     def test_api_delete_currency_exchange(self):
         # delete the initial transaction
         from_account = self.account

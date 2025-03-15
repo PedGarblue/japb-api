@@ -1,8 +1,13 @@
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
+from django.db.models import Sum
+from celery import shared_task
+
 from japb_api.celery import app
 from japb_api.products.models import ProductList, ProductListItem
-from datetime import datetime, timedelta
-from dateutil.relativedelta import relativedelta
-
+from japb_api.users.models import User
+from japb_api.transactions.models import TransactionItem
+from japb_api.products.models import ProductList, ProductListItem
 
 @app.task
 # when a product list period ends, we need to renew it
@@ -37,3 +42,24 @@ def renew_product_lists():
                 quantity=item.quantity,
                 quantity_purchased=0,  # Reset purchased quantity for the new period
             )
+
+@shared_task
+def update_user_product_list_items(user_pk, transaction_items_pks):
+    user = User.objects.get(pk=user_pk)
+    # get active product lists
+    # active product lists are those that have a period_end greater than the current date
+    transaction_items = TransactionItem.objects.filter(transaction__user=user, id__in=transaction_items_pks)
+    product_lists = ProductList.objects.filter(user=user, period_end__gt=datetime.now())
+
+    for product_list in product_lists:
+        # get productItems from the product list
+        product_list_items = ProductListItem.objects.filter(product_list=product_list)
+        # update the product list items with the transaction items
+        for product_list_item in product_list_items:
+            product_list_item.quantity_purchased = (
+                product_list_item.quantity_purchased + (
+                    transaction_items.filter(product=product_list_item.product)
+                    .aggregate(Sum("quantity"))["quantity__sum"] or 0
+                )
+            )
+            product_list_item.save()

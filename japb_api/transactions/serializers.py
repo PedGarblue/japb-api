@@ -1,11 +1,19 @@
 import django_filters
 from rest_framework import serializers
-from .models import Transaction, CurrencyExchange, ExchangeComission, Category
+from .models import Transaction, CurrencyExchange, ExchangeComission, Category, TransactionItem
 from japb_api.accounts.models import Account
+
+
+class TransactionItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TransactionItem
+        fields = ['id', 'product', 'quantity', 'price', 'total_price']
+        read_only_fields = ['id']
 
 
 class TransactionSerializer(serializers.ModelSerializer):
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
+    transaction_items = TransactionItemSerializer(many=True, required=False)
 
     class Meta:
         model = Transaction
@@ -18,8 +26,18 @@ class TransactionSerializer(serializers.ModelSerializer):
             "account",
             "category",
             "date",
+            "transaction_items",
         ]
         read_only_fields = ["id"]
+
+    def create(self, validated_data):
+        transaction_items_data = validated_data.pop('transaction_items', [])
+        transaction = Transaction.objects.create(**validated_data)
+
+        for transaction_item_data in transaction_items_data:
+            TransactionItem.objects.create(transaction=transaction, **transaction_item_data)
+
+        return transaction
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)

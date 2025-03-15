@@ -1,4 +1,5 @@
 from django.db import models
+from django.core.validators import MinValueValidator
 from ..accounts.models import Account
 
 
@@ -16,6 +17,19 @@ class Transaction(models.Model):
     def __str__(self):
         return f"{self.description} {self.amount}"
 
+class TransactionItem(models.Model):
+    transaction = models.ForeignKey("Transaction", on_delete=models.CASCADE)
+    product = models.ForeignKey("products.Product", on_delete=models.CASCADE)
+    quantity = models.IntegerField(default=0, validators=[MinValueValidator(0)])
+    # not used for now, the frontend will only ask for the quantity
+    price = models.IntegerField(null=True)
+    total_price = models.IntegerField(null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.product.name} {self.quantity} {self.price} {self.total_price}"
 
 class CurrencyExchange(Transaction):
     TYPE_CHOICES = [

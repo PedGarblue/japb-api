@@ -9,7 +9,7 @@ from .tasks import update_reports
 from ..accounts.models import Account
 from japb_api.currencies.models import CurrencyConversionHistorial
 from .permissions import IsOwnerOrReadOnly, IsOwner
-from .models import Transaction, CurrencyExchange, Category
+from .models import Transaction, CurrencyExchange, Category, TransactionItem
 from .serializers import (
     TransactionSerializer,
     CurrencyExchangeSerializer,
@@ -17,7 +17,7 @@ from .serializers import (
     CategorySerializer,
     TransactionFilterSet,
 )
-
+from japb_api.products.tasks import update_user_product_list_items
 
 def parse_amount(amount, decimal_places):
     return int(amount * (10**decimal_places))
@@ -77,6 +77,12 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 transaction = transaction_serializer.save()
                 created_transactions.append(transaction_serializer.data)
                 update_reports.delay(transaction.account.id)
+
+                transaction_items = TransactionItem.objects.filter(transaction=transaction)
+                update_user_product_list_items.delay(
+                    transaction.user.id,
+                    [item.id for item in transaction_items]
+                )
             else:
                 return Response(
                     transaction_serializer.errors, status=status.HTTP_400_BAD_REQUEST

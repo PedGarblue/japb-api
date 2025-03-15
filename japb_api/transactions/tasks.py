@@ -3,7 +3,6 @@ from celery import shared_task
 from japb_api.reports.models import ReportAccount, ReportCurrency
 from japb_api.accounts.models import Account
 
-
 @shared_task
 def update_reports(account_pk):
     account = Account.objects.get(pk=account_pk)
