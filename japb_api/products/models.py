@@ -35,3 +35,11 @@ class ProductListItem(models.Model):
     quantity_purchased = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return (
+            f"Prod: {self.product.name} "
+            f"Qty: {self.quantity} "
+            f"Qty Purchased: {self.quantity_purchased} "
+            f"Pl: {self.product_list.name}"
+        )

@@ -29,7 +29,7 @@ class TransactionItem(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.product.name} {self.quantity} {self.price} {self.total_price}"
+        return f"N: {self.product.name} Q: {self.quantity} P: {self.price} TP: {self.total_price}"
 
 class CurrencyExchange(Transaction):
     TYPE_CHOICES = [

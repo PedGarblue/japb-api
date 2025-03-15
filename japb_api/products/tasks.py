@@ -6,8 +6,7 @@ from celery import shared_task
 from japb_api.celery import app
 from japb_api.products.models import ProductList, ProductListItem
 from japb_api.users.models import User
-from japb_api.transactions.models import TransactionItem
-from japb_api.products.models import ProductList, ProductListItem
+from japb_api.transactions.models import Transaction, TransactionItem
 
 @app.task
 # when a product list period ends, we need to renew it
@@ -44,22 +43,32 @@ def renew_product_lists():
             )
 
 @shared_task
-def update_user_product_list_items(user_pk, transaction_items_pks):
+def update_user_product_list_items(user_pk):
     user = User.objects.get(pk=user_pk)
     # get active product lists
-    # active product lists are those that have a period_end greater than the current date
-    transaction_items = TransactionItem.objects.filter(transaction__user=user, id__in=transaction_items_pks)
-    product_lists = ProductList.objects.filter(user=user, period_end__gt=datetime.now())
+    # active product lists are those that have a period_start less than or equal to the current date
+    # and a period_end greater than the current date
+    product_lists = ProductList.objects.filter(
+        user=user,
+        period_start__lte=datetime.now(),
+        period_end__gt=datetime.now()
+    )
 
     for product_list in product_lists:
-        # get productItems from the product list
+        # get user transaction and then the transaction items
+        transactions = Transaction.objects.filter(
+            user=user,
+            date__range=(product_list.period_start, product_list.period_end)
+        )
+
         product_list_items = ProductListItem.objects.filter(product_list=product_list)
-        # update the product list items with the transaction items
+
         for product_list_item in product_list_items:
+            transaction_items_for_product = TransactionItem.objects.filter(
+                transaction__in=transactions,
+                product=product_list_item.product
+            )
             product_list_item.quantity_purchased = (
-                product_list_item.quantity_purchased + (
-                    transaction_items.filter(product=product_list_item.product)
-                    .aggregate(Sum("quantity"))["quantity__sum"] or 0
-                )
+                transaction_items_for_product.aggregate(Sum("quantity"))["quantity__sum"] or 0
             )
             product_list_item.save()

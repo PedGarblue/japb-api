@@ -76,13 +76,9 @@ class TransactionViewSet(viewsets.ModelViewSet):
             if transaction_serializer.is_valid():
                 transaction = transaction_serializer.save()
                 created_transactions.append(transaction_serializer.data)
-                update_reports.delay(transaction.account.id)
 
-                transaction_items = TransactionItem.objects.filter(transaction=transaction)
-                update_user_product_list_items.delay(
-                    transaction.user.id,
-                    [item.id for item in transaction_items]
-                )
+                update_reports.delay(transaction.account.id)
+                update_user_product_list_items.delay(transaction.user.id)
             else:
                 return Response(
                     transaction_serializer.errors, status=status.HTTP_400_BAD_REQUEST
@@ -130,12 +126,14 @@ class TransactionViewSet(viewsets.ModelViewSet):
         if serializer.is_valid():
             serializer.save()
             update_reports.delay(transaction.account.id)
+            update_user_product_list_items.delay(transaction.user.id)
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, *args, **kwargs):
         transaction_pk = self.get_queryset().get(pk=kwargs["pk"])
         update_reports.delay(transaction_pk.account.id)
+        update_user_product_list_items.delay(transaction_pk.user.id)
         return super().destroy(request, *args, **kwargs)
 
 
