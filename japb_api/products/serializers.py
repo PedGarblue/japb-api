@@ -45,6 +45,7 @@ class ProductListItemSerializer(serializers.ModelSerializer):
             "product_category_color",  # this is a read-only field
             "product_list",
             "quantity",
+            "quantity_purchased",
             "total",
             "created_at",
             "updated_at",
@@ -62,10 +63,39 @@ class ProductListSerializer(serializers.ModelSerializer):
             "user",
             "name",
             "total",
+            "period_type",
+            "period_start",
+            "period_end",
             "description",
             "created_at",
             "updated_at",
         ]
+
+    def validate(self, data):
+        period_type = data.get("period_type")
+        period_start = data.get("period_start")
+        period_end = data.get("period_end")
+
+        if period_type == "MONTHLY":
+            if not period_start:
+                raise serializers.ValidationError(
+                    "When period_type is MONTHLY, period_start must be provided"
+                )
+            if not period_end:
+                raise serializers.ValidationError(
+                    "When period_type is MONTHLY, period_end must be provided"
+                )
+        elif period_type == "NO_PERIOD":
+            if period_start:
+                raise serializers.ValidationError(
+                    "When period_type is NO_PERIOD, period_start should not be set"
+                )
+            if period_end:
+                raise serializers.ValidationError(
+                    "When period_type is NO_PERIOD, period_end should not be set"
+                )
+
+        return data
 
     def get_total(self, product_list):
         queryset = ProductListItem.objects.annotate(
