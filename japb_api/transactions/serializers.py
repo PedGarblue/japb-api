@@ -13,7 +13,7 @@ class TransactionItemSerializer(serializers.ModelSerializer):
 
 class TransactionSerializer(serializers.ModelSerializer):
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
-    transaction_items = TransactionItemSerializer(many=True, required=False)
+    transaction_items = TransactionItemSerializer(source='transactionitem_set', many=True, required=False)
 
     class Meta:
         model = Transaction
@@ -31,11 +31,15 @@ class TransactionSerializer(serializers.ModelSerializer):
         read_only_fields = ["id"]
 
     def create(self, validated_data):
-        transaction_items_data = validated_data.pop('transaction_items', [])
+        transaction_items_data = None
+        if 'transactionitem_set' in validated_data:
+            transaction_items_data = validated_data.pop('transactionitem_set')
+
         transaction = Transaction.objects.create(**validated_data)
 
-        for transaction_item_data in transaction_items_data:
-            TransactionItem.objects.create(transaction=transaction, **transaction_item_data)
+        if transaction_items_data:
+            for transaction_item_data in transaction_items_data:
+                TransactionItem.objects.create(transaction=transaction, **transaction_item_data)
 
         return transaction
 
@@ -49,6 +53,27 @@ class TransactionSerializer(serializers.ModelSerializer):
             )
             rep["to_main_currency_amount"] = f"{to_main_currency_amount:.2f}"
         return rep
+
+    def update(self, instance, validated_data):
+        transaction_items_data = None
+        if 'transactionitem_set' in validated_data:
+            transaction_items_data = validated_data.pop('transactionitem_set')
+
+        # Update transaction fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        # Handle transaction items if provided
+        if transaction_items_data is not None:
+            # Remove existing items if new ones are provided
+            instance.transactionitem_set.all().delete()
+
+            # Create new items
+            for transaction_item_data in transaction_items_data:
+                TransactionItem.objects.create(transaction=instance, **transaction_item_data)
+
+        return instance
 
 
 class CurrencyExchangeSerializer(serializers.ModelSerializer):

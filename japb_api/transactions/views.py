@@ -9,7 +9,7 @@ from .tasks import update_reports
 from ..accounts.models import Account
 from japb_api.currencies.models import CurrencyConversionHistorial
 from .permissions import IsOwnerOrReadOnly, IsOwner
-from .models import Transaction, CurrencyExchange, Category, TransactionItem
+from .models import Transaction, CurrencyExchange, Category
 from .serializers import (
     TransactionSerializer,
     CurrencyExchangeSerializer,
