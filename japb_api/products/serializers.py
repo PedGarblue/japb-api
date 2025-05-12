@@ -117,6 +117,7 @@ class ProductFilterSet(django_filters.FilterSet):
     name = django_filters.CharFilter(lookup_expr="icontains")
     description = django_filters.CharFilter(lookup_expr="icontains")
     status = django_filters.CharFilter(lookup_expr="icontains")
+    id = django_filters.BaseInFilter(field_name='id', lookup_expr='in')
     category = django_filters.ModelChoiceFilter(queryset=Category.objects.all())
     min_price = django_filters.NumberFilter(field_name="cost", lookup_expr="gte")
     max_price = django_filters.NumberFilter(field_name="cost", lookup_expr="lte")
