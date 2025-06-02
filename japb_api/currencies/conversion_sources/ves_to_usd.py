@@ -4,7 +4,7 @@ class VesToUsd:
     def getLatestRate():
         url = "https://pydolarve.org/api/v1/dollar"
         params = {
-            "page": "enparalelovzla",
+            "page": "criptodolar",
             "format_date": "iso",
             "rounded_price": "true",
         }
@@ -37,7 +37,7 @@ class VesToUsd:
 
         if response.status_code == 200:
             data = response.json()
-            rate = data["monitors"]["enparalelovzla"]["price"]
+            rate = data["monitors"]["binance"]["price"]
             return rate
         else:
             return None
