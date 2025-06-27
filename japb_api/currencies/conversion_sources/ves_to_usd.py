@@ -4,7 +4,7 @@ class VesToUsd:
     def getLatestRate():
         url = "https://pydolarve.org/api/v1/dollar"
         params = {
-            "page": "criptodolar",
+            "page": "binance",
             "format_date": "iso",
             "rounded_price": "true",
         }
