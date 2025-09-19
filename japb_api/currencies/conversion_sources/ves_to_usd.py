@@ -1,5 +1,6 @@
 import requests
 
+
 class VesToUsd:
     def getLatestRate():
         # url = "https://pydolarve.org/api/v1/dollar"
@@ -13,29 +14,6 @@ class VesToUsd:
 
         # EXPECTED RESPONSE:
         # {
-        #     "datetime": {
-        #         "date":
-        #         "domingo, 12 de enero de 2025",
-        #         "time":
-        #         "2:56:17 p. m."
-        #     },
-        #     "monitors": {
-        #         "enparalelovzla": {
-        #             "change": 0.23,
-        #             "color": "green",
-        #             "image": "https://res.cloudinary.com/dcpyfqx87...",
-        #             "last_update": "2025-01-10T13:32:56-04:00",
-        #             "percent": 0.34,
-        #             "price": 68.23,
-        #             "price_old": 68,
-        #             "symbol": "▲",
-        #             "title": "EnParaleloVzla"
-        #         }
-        #     }
-        # }
-
-        # EXPECTED RESPONSE:
-        # {
         #   "fuente": "paralelo",
         #   "nombre": "Paralelo",
         #   "compra": null,
@@ -44,6 +22,18 @@ class VesToUsd:
         #   "fechaActualizacion": "2025-09-15T16:04:01.990Z"
         # }
 
+        response = requests.get(url, headers=headers)
+
+        if response.status_code == 200:
+            data = response.json()
+            rate = data["promedio"]
+            return rate
+        else:
+            return None
+
+    def getLatestRateBCV():
+        url = "https://ve.dolarapi.com/v1/dolares/oficial"
+        headers = {"Content-Type": "application/json"}
         response = requests.get(url, headers=headers)
 
         if response.status_code == 200:

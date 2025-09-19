@@ -6,7 +6,7 @@ from django.views.generic.base import RedirectView
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import (TokenObtainPairView, TokenRefreshView)
 from .users.views import UserViewSet, UserCreateViewSet, LoggedUserViewSet
-from .currencies.views import CurrencyViewSet
+from .currencies.views import CurrencyViewSet, CurrencyConversionViewSet
 from .accounts.views import AccountViewSet
 from .transactions.views import TransactionViewSet, CurrencyExchangeViewSet, CategoryViewSet
 from .receivables.views import ReceivableViewSet
@@ -18,6 +18,7 @@ router.register(r'user', LoggedUserViewSet, basename='user')
 router.register(r'users', UserViewSet)
 router.register(r'users', UserCreateViewSet)
 router.register(r'currencies', CurrencyViewSet, basename='currencies')
+router.register(r'currency-conversion', CurrencyConversionViewSet, basename='currency-conversion')
 router.register(r'accounts', AccountViewSet, basename='accounts')
 router.register(r'transactions', TransactionViewSet, basename='transactions')
 router.register(r'categories', CategoryViewSet, basename='categories')

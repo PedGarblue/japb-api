@@ -21,6 +21,12 @@ class CurrencyConversionHistorial(models.Model):
     currency_to = models.ForeignKey(
         "Currency", related_name="currency_to", on_delete=models.CASCADE
     )
+    source = models.CharField(
+        max_length=100,
+        default="paralelo",
+        choices=[("paralelo", "Paralelo"), ("bcv", "BCV")],
+    )
+
     rate = models.FloatField()
     date = models.DateTimeField(auto_now_add=True)
 

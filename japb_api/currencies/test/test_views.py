@@ -5,7 +5,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from ..models import Currency
+from ..models import Currency, CurrencyConversionHistorial
 from japb_api.currencies.factories import CurrencyFactory
 from japb_api.users.factories import UserFactory
 from japb_api.accounts.models import Account
@@ -249,3 +249,171 @@ class TestCurrencyViews(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(Currency.objects.count(), 0)
+
+
+class TestCurrencyConversionViews(APITestCase):
+    def setUp(self):
+        self.fake = Faker(["en-US"])
+        self.user = UserFactory()
+        self.token = RefreshToken.for_user(self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.token.access_token}")
+
+        # Create required currencies
+        self.usd_currency = Currency.objects.create(name="USD", symbol="$")
+        self.ves_currency = Currency.objects.create(name="VES", symbol="Bs.")
+
+    def test_api_get_currency_conversion_with_both_rates(self):
+        """Test that the endpoint returns both VES and VES_BCV rates when available"""
+        # Create conversion history for both sources
+        CurrencyConversionHistorial.objects.create(
+            currency_from=self.ves_currency,
+            currency_to=self.usd_currency,
+            source="paralelo",
+            rate=260.13,
+        )
+
+        CurrencyConversionHistorial.objects.create(
+            currency_from=self.ves_currency,
+            currency_to=self.usd_currency,
+            source="bcv",
+            rate=160.12,
+        )
+
+        url = reverse("currency-conversion-list")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        expected_response = {"USD": {"VES_BCV": 160.12, "VES": 260.13}}
+
+        self.assertEqual(response.json(), expected_response)
+
+    def test_api_get_currency_conversion_with_only_paralelo_rate(self):
+        """Test that the endpoint returns only VES rate when only paralelo source is available"""
+        CurrencyConversionHistorial.objects.create(
+            currency_from=self.ves_currency,
+            currency_to=self.usd_currency,
+            source="paralelo",
+            rate=260.13,
+        )
+
+        url = reverse("currency-conversion-list")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        expected_response = {"USD": {"VES": 260.13}}
+
+        self.assertEqual(response.json(), expected_response)
+
+    def test_api_get_currency_conversion_with_only_bcv_rate(self):
+        """Test that the endpoint returns only VES_BCV rate when only BCV source is available"""
+        CurrencyConversionHistorial.objects.create(
+            currency_from=self.ves_currency,
+            currency_to=self.usd_currency,
+            source="bcv",
+            rate=160.12,
+        )
+
+        url = reverse("currency-conversion-list")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        expected_response = {"USD": {"VES_BCV": 160.12}}
+
+        self.assertEqual(response.json(), expected_response)
+
+    def test_api_get_currency_conversion_with_no_rates(self):
+        """Test that the endpoint returns empty USD object when no conversion rates exist"""
+        url = reverse("currency-conversion-list")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        expected_response = {"USD": {}}
+
+        self.assertEqual(response.json(), expected_response)
+
+    def test_api_get_currency_conversion_missing_usd_currency(self):
+        """Test that the endpoint handles missing USD currency gracefully"""
+        # Delete USD currency
+        self.usd_currency.delete()
+
+        url = reverse("currency-conversion-list")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        expected_response = {"USD": {}}
+
+        self.assertEqual(response.json(), expected_response)
+
+    def test_api_get_currency_conversion_missing_ves_currency(self):
+        """Test that the endpoint handles missing VES currency gracefully"""
+        # Delete VES currency
+        self.ves_currency.delete()
+
+        url = reverse("currency-conversion-list")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        expected_response = {"USD": {}}
+
+        self.assertEqual(response.json(), expected_response)
+
+    def test_api_get_currency_conversion_latest_rates_only(self):
+        """Test that the endpoint returns only the latest rates when multiple exist"""
+        from datetime import timedelta
+        from django.utils import timezone
+
+        # Create older conversion rates
+        old_date = timezone.now() - timedelta(days=1)
+        CurrencyConversionHistorial.objects.create(
+            currency_from=self.ves_currency,
+            currency_to=self.usd_currency,
+            source="paralelo",
+            rate=250.00,
+        )
+        # Manually set older date
+        old_paralelo = CurrencyConversionHistorial.objects.filter(
+            source="paralelo"
+        ).first()
+        old_paralelo.date = old_date
+        old_paralelo.save()
+
+        CurrencyConversionHistorial.objects.create(
+            currency_from=self.ves_currency,
+            currency_to=self.usd_currency,
+            source="bcv",
+            rate=150.00,
+        )
+        # Manually set older date
+        old_bcv = CurrencyConversionHistorial.objects.filter(source="bcv").first()
+        old_bcv.date = old_date
+        old_bcv.save()
+
+        # Create newer conversion rates
+        CurrencyConversionHistorial.objects.create(
+            currency_from=self.ves_currency,
+            currency_to=self.usd_currency,
+            source="paralelo",
+            rate=260.13,
+        )
+
+        CurrencyConversionHistorial.objects.create(
+            currency_from=self.ves_currency,
+            currency_to=self.usd_currency,
+            source="bcv",
+            rate=160.12,
+        )
+
+        url = reverse("currency-conversion-list")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        expected_response = {"USD": {"VES_BCV": 160.12, "VES": 260.13}}
+
+        self.assertEqual(response.json(), expected_response)
