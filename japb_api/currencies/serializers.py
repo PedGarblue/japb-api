@@ -27,9 +27,16 @@ class CurrencySerializer(serializers.ModelSerializer):
         except Currency.DoesNotExist:
             return None
 
-        queryset = CurrencyConversionHistorial.objects.filter(
-            currency_from=currency.id, currency_to=usd_currency
-        )
+        # TODO: this is a temporal fix while the frontend is not ready to handle multiple sources
+        if currency.name == "VES":
+            queryset = CurrencyConversionHistorial.objects.filter(
+                currency_from=currency.id, currency_to=usd_currency, source="paralelo"
+            )
+        else:
+            queryset = CurrencyConversionHistorial.objects.filter(
+                currency_from=currency.id, currency_to=usd_currency
+            )
+
         conversion = queryset.order_by("-date").first()
 
         if conversion:
