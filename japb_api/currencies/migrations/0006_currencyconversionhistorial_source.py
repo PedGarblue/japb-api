@@ -12,6 +12,10 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="currencyconversionhistorial",
             name="source",
-            field=models.CharField(default="paralelo", max_length=100, unique=True),
+            field=models.CharField(
+                default="paralelo",
+                max_length=100,
+                choices=[("paralelo", "Paralelo"), ("bcv", "BCV")],
+            ),
         ),
     ]
