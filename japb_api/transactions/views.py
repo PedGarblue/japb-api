@@ -252,7 +252,7 @@ class CurrencyExchangeViewSet(viewsets.ModelViewSet):
             transaction_to_serializer.data,
         ]
         # Create the comission transaction
-        if account_from.currency == account_to.currency:
+        if account_from.currency == account_to.currency and comission_amount != 0:
             comission_transaction_data = {
                 "amount": request.data["to_amount"] - request.data["from_amount"],
                 "account": request.data["from_account"],
