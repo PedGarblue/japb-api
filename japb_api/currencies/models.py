@@ -6,6 +6,9 @@ class Currency(models.Model):
     user = models.ForeignKey("users.User", null=True, on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
     symbol = models.CharField(max_length=5, null=True)
+    default_conversion_source = models.CharField(
+        max_length=100, null=True
+    )
 
     def __str__(self):
         return self.name

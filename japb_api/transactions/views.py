@@ -62,6 +62,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 CurrencyConversionHistorial.objects.filter(
                     currency_from=account.currency,
                     currency_to__name="USD",
+                    source=account.currency.default_conversion_source,
                     date__lte=transaction_serializer.initial_data.get("date"),
                 )
                 .order_by("-date")

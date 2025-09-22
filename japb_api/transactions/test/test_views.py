@@ -28,7 +28,7 @@ class TestCurrencyTransaction(APITestCase):
         )
         self.token = RefreshToken.for_user(self.user)
 
-        self.currency = Currency.objects.create(name="VES")
+        self.currency = Currency.objects.create(name="VES", default_conversion_source="paralelo")
         self.account = Account.objects.create(
             name="Test Account", currency=self.currency, decimal_places=2
         )
@@ -43,6 +43,7 @@ class TestCurrencyTransaction(APITestCase):
             currency_to=self.main_currency,
             date=datetime.now(tz=timezone.utc),
             rate=60,
+            source="paralelo",
         )
 
         self.data = {
