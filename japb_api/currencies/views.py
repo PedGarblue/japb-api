@@ -20,11 +20,13 @@ class CurrencyConversionViewSet(viewsets.ViewSet):
 
     def list(self, request):
         """
-        Return current exchange rates to USD in the format:
+        Return current exchange rates by source currency in the format:
         {
-           "USD":  {
-                "VES_BCV": 160.12,
-                "VES": 260.13,
+           "VES":  {
+                "USD": {
+                    "paralelo": 260.13,
+                    "bcv": 160.12
+                }
              }
         }
         """
@@ -52,15 +54,15 @@ class CurrencyConversionViewSet(viewsets.ViewSet):
                 .first()
             )
 
-            result = {"USD": {}}
+            result = {"VES": {"USD": {}}}
 
             if ves_bcv_conversion:
-                result["USD"]["VES_BCV"] = ves_bcv_conversion.rate
+                result["VES"]["USD"]["bcv"] = ves_bcv_conversion.rate
 
             if ves_conversion:
-                result["USD"]["VES"] = ves_conversion.rate
+                result["VES"]["USD"]["paralelo"] = ves_conversion.rate
 
             return Response(result)
 
         except Currency.DoesNotExist:
-            return Response({"USD": {}})
+            return Response({"VES": {"USD": {}}})

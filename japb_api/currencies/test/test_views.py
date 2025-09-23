@@ -263,7 +263,7 @@ class TestCurrencyConversionViews(APITestCase):
         self.ves_currency = Currency.objects.create(name="VES", symbol="Bs.")
 
     def test_api_get_currency_conversion_with_both_rates(self):
-        """Test that the endpoint returns both VES and VES_BCV rates when available"""
+        """Test that the endpoint returns both paralelo and bcv rates when available"""
         # Create conversion history for both sources
         CurrencyConversionHistorial.objects.create(
             currency_from=self.ves_currency,
@@ -284,12 +284,12 @@ class TestCurrencyConversionViews(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        expected_response = {"USD": {"VES_BCV": 160.12, "VES": 260.13}}
+        expected_response = {"VES": {"USD": {"bcv": 160.12, "paralelo": 260.13}}}
 
         self.assertEqual(response.json(), expected_response)
 
     def test_api_get_currency_conversion_with_only_paralelo_rate(self):
-        """Test that the endpoint returns only VES rate when only paralelo source is available"""
+        """Test that the endpoint returns only paralelo rate when only paralelo source is available"""
         CurrencyConversionHistorial.objects.create(
             currency_from=self.ves_currency,
             currency_to=self.usd_currency,
@@ -302,12 +302,12 @@ class TestCurrencyConversionViews(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        expected_response = {"USD": {"VES": 260.13}}
+        expected_response = {"VES": {"USD": {"paralelo": 260.13}}}
 
         self.assertEqual(response.json(), expected_response)
 
     def test_api_get_currency_conversion_with_only_bcv_rate(self):
-        """Test that the endpoint returns only VES_BCV rate when only BCV source is available"""
+        """Test that the endpoint returns only bcv rate when only BCV source is available"""
         CurrencyConversionHistorial.objects.create(
             currency_from=self.ves_currency,
             currency_to=self.usd_currency,
@@ -320,7 +320,7 @@ class TestCurrencyConversionViews(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        expected_response = {"USD": {"VES_BCV": 160.12}}
+        expected_response = {"VES": {"USD": {"bcv": 160.12}}}
 
         self.assertEqual(response.json(), expected_response)
 
@@ -331,7 +331,7 @@ class TestCurrencyConversionViews(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        expected_response = {"USD": {}}
+        expected_response = {"VES": {"USD": {}}}
 
         self.assertEqual(response.json(), expected_response)
 
@@ -345,7 +345,7 @@ class TestCurrencyConversionViews(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        expected_response = {"USD": {}}
+        expected_response = {"VES": {"USD": {}}}
 
         self.assertEqual(response.json(), expected_response)
 
@@ -359,7 +359,7 @@ class TestCurrencyConversionViews(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        expected_response = {"USD": {}}
+        expected_response = {"VES": {"USD": {}}}
 
         self.assertEqual(response.json(), expected_response)
 
@@ -414,6 +414,6 @@ class TestCurrencyConversionViews(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        expected_response = {"USD": {"VES_BCV": 160.12, "VES": 260.13}}
+        expected_response = {"VES": {"USD": {"bcv": 160.12, "paralelo": 260.13}}}
 
         self.assertEqual(response.json(), expected_response)
