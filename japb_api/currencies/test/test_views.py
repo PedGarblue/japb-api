@@ -288,7 +288,7 @@ class TestCurrencyConversionViews(APITestCase):
             "VES": {
                 "USD": {
                     "rates": {"bcv": 160.12, "paralelo": 260.13},
-                    "gap": 62.46  # ((260.13 - 160.12) / 160.12) * 100 = 62.459375, rounded to 2 places
+                    "gap": 38.45  # ((260.13 - 160.12) / 260.13) * 100 = 38.453, rounded to 2 places
                 }
             }
         }
@@ -443,7 +443,7 @@ class TestCurrencyConversionViews(APITestCase):
             "VES": {
                 "USD": {
                     "rates": {"bcv": 160.12, "paralelo": 260.13},
-                    "gap": 62.46  # ((260.13 - 160.12) / 160.12) * 100 = 62.459375, rounded to 2 places
+                    "gap": 38.45  # ((260.13 - 160.12) / 260.13) * 100 = 38.453, rounded to 2 places
                 }
             }
         }
