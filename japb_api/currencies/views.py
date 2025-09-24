@@ -67,8 +67,10 @@ class CurrencyConversionViewSet(viewsets.ViewSet):
 
             # Calculate gap if both rates are available
             if ves_bcv_conversion and ves_conversion:
-                gap = ves_bcv_conversion.rate / ves_conversion.rate
-                result["VES"]["USD"]["gap"] = round(gap, 4)
+                gap = (
+                    (ves_conversion.rate - ves_bcv_conversion.rate) / ves_bcv_conversion.rate
+                ) * 100
+                result["VES"]["USD"]["gap"] = round(gap, 2)
 
             return Response(result)
 
