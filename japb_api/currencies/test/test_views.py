@@ -263,7 +263,7 @@ class TestCurrencyConversionViews(APITestCase):
         self.ves_currency = Currency.objects.create(name="VES", symbol="Bs.")
 
     def test_api_get_currency_conversion_with_both_rates(self):
-        """Test that the endpoint returns both paralelo and bcv rates when available"""
+        """Test that the endpoint returns both paralelo and bcv rates when available with gap calculation"""
         # Create conversion history for both sources
         CurrencyConversionHistorial.objects.create(
             currency_from=self.ves_currency,
@@ -284,7 +284,14 @@ class TestCurrencyConversionViews(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        expected_response = {"VES": {"USD": {"bcv": 160.12, "paralelo": 260.13}}}
+        expected_response = {
+            "VES": {
+                "USD": {
+                    "rates": {"bcv": 160.12, "paralelo": 260.13},
+                    "gap": 0.6155  # 160.12 / 260.13
+                }
+            }
+        }
 
         self.assertEqual(response.json(), expected_response)
 
@@ -302,7 +309,7 @@ class TestCurrencyConversionViews(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        expected_response = {"VES": {"USD": {"paralelo": 260.13}}}
+        expected_response = {"VES": {"USD": {"rates": {"paralelo": 260.13}}}}
 
         self.assertEqual(response.json(), expected_response)
 
@@ -320,18 +327,18 @@ class TestCurrencyConversionViews(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        expected_response = {"VES": {"USD": {"bcv": 160.12}}}
+        expected_response = {"VES": {"USD": {"rates": {"bcv": 160.12}}}}
 
         self.assertEqual(response.json(), expected_response)
 
     def test_api_get_currency_conversion_with_no_rates(self):
-        """Test that the endpoint returns empty USD object when no conversion rates exist"""
+        """Test that the endpoint returns empty rates object when no conversion rates exist"""
         url = reverse("currency-conversion-list")
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        expected_response = {"VES": {"USD": {}}}
+        expected_response = {"VES": {"USD": {"rates": {}}}}
 
         self.assertEqual(response.json(), expected_response)
 
@@ -345,7 +352,7 @@ class TestCurrencyConversionViews(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        expected_response = {"VES": {"USD": {}}}
+        expected_response = {"VES": {"USD": {"rates": {}}}}
 
         self.assertEqual(response.json(), expected_response)
 
@@ -359,9 +366,27 @@ class TestCurrencyConversionViews(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        expected_response = {"VES": {"USD": {}}}
+        expected_response = {"VES": {"USD": {"rates": {}}}}
 
         self.assertEqual(response.json(), expected_response)
+
+    def test_api_get_currency_conversion_gap_not_included_with_single_rate(self):
+        """Test that gap is not included when only one rate is available"""
+        CurrencyConversionHistorial.objects.create(
+            currency_from=self.ves_currency,
+            currency_to=self.usd_currency,
+            source="paralelo",
+            rate=260.13,
+        )
+
+        url = reverse("currency-conversion-list")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        response_data = response.json()
+        self.assertNotIn("gap", response_data["VES"]["USD"])
+        self.assertEqual(response_data["VES"]["USD"]["rates"]["paralelo"], 260.13)
 
     def test_api_get_currency_conversion_latest_rates_only(self):
         """Test that the endpoint returns only the latest rates when multiple exist"""
@@ -414,6 +439,13 @@ class TestCurrencyConversionViews(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        expected_response = {"VES": {"USD": {"bcv": 160.12, "paralelo": 260.13}}}
+        expected_response = {
+            "VES": {
+                "USD": {
+                    "rates": {"bcv": 160.12, "paralelo": 260.13},
+                    "gap": 0.6155  # 160.12 / 260.13
+                }
+            }
+        }
 
         self.assertEqual(response.json(), expected_response)

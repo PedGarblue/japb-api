@@ -24,8 +24,11 @@ class CurrencyConversionViewSet(viewsets.ViewSet):
         {
            "VES":  {
                 "USD": {
-                    "paralelo": 260.13,
-                    "bcv": 160.12
+                    "rates": {
+                        "paralelo": 260.13,
+                        "bcv": 160.12
+                    },
+                    "gap": 0.6155 // bcv / paralelo
                 }
              }
         }
@@ -54,15 +57,20 @@ class CurrencyConversionViewSet(viewsets.ViewSet):
                 .first()
             )
 
-            result = {"VES": {"USD": {}}}
+            result = {"VES": {"USD": {"rates": {}}}}
 
             if ves_bcv_conversion:
-                result["VES"]["USD"]["bcv"] = ves_bcv_conversion.rate
+                result["VES"]["USD"]["rates"]["bcv"] = ves_bcv_conversion.rate
 
             if ves_conversion:
-                result["VES"]["USD"]["paralelo"] = ves_conversion.rate
+                result["VES"]["USD"]["rates"]["paralelo"] = ves_conversion.rate
+
+            # Calculate gap if both rates are available
+            if ves_bcv_conversion and ves_conversion:
+                gap = ves_bcv_conversion.rate / ves_conversion.rate
+                result["VES"]["USD"]["gap"] = round(gap, 4)
 
             return Response(result)
 
         except Currency.DoesNotExist:
-            return Response({"VES": {"USD": {}}})
+            return Response({"VES": {"USD": {"rates": {}}}})
