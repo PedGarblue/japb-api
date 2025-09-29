@@ -12,7 +12,7 @@ class _BcvEurParser(HTMLParser):
     def handle_starttag(self, tag, attrs):
         if tag == "div":
             attrs_dict = dict(attrs)
-            if attrs_dict.get("id") == "dolar":
+            if attrs_dict.get("id") == "euro":
                 self._target_depth = 1
             elif self._target_depth:
                 self._target_depth += 1
