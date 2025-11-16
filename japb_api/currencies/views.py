@@ -28,7 +28,13 @@ class CurrencyConversionViewSet(viewsets.ViewSet):
                         "paralelo": 260.13,
                         "bcv": 160.12
                     },
-                    "gap": 0.6155 // bcv / paralelo
+                    "gap": 38.45
+                },
+                "EUR": {
+                    "rates": {
+                        "bcv": 210.12
+                    },
+                    "gap": 19.23
                 }
              }
         }
@@ -36,7 +42,16 @@ class CurrencyConversionViewSet(viewsets.ViewSet):
         try:
             usd_currency = Currency.objects.get(name="USD")
             ves_currency = Currency.objects.get(name="VES")
+            eur_currency = Currency.objects.get(name="EUR")
 
+            result = {
+                "VES": {
+                    "USD": {"rates": {}},
+                    "EUR": {"rates": {}}
+                }
+            }
+
+            # VES to USD conversions
             # Get latest VES to USD rate (paralelo source)
             ves_conversion = (
                 CurrencyConversionHistorial.objects.filter(
@@ -57,22 +72,45 @@ class CurrencyConversionViewSet(viewsets.ViewSet):
                 .first()
             )
 
-            result = {"VES": {"USD": {"rates": {}}}}
-
             if ves_bcv_conversion:
                 result["VES"]["USD"]["rates"]["bcv"] = ves_bcv_conversion.rate
 
             if ves_conversion:
                 result["VES"]["USD"]["rates"]["paralelo"] = ves_conversion.rate
 
-            # Calculate gap if both rates are available
+            # Calculate gap if both VES rates are available
             if ves_bcv_conversion and ves_conversion:
                 gap = (
                     (ves_conversion.rate - ves_bcv_conversion.rate) / ves_conversion.rate
                 ) * 100
                 result["VES"]["USD"]["gap"] = round(gap, 2)
 
+            # VES to EUR conversions
+            # Get latest VES to EUR rate (BCV source)
+            ves_eur_conversion = (
+                CurrencyConversionHistorial.objects.filter(
+                    currency_from=ves_currency, currency_to=eur_currency, source="bcv"
+                )
+                .order_by("-date")
+                .first()
+            )
+
+            if ves_eur_conversion:
+                result["VES"]["EUR"]["rates"]["bcv"] = ves_eur_conversion.rate
+
+            # Calculate EUR gap if both VES->EUR (BCV) and VES->USD (paralelo) rates are available
+            if ves_eur_conversion and ves_conversion:
+                gap = (
+                    (ves_conversion.rate - ves_eur_conversion.rate) / ves_conversion.rate
+                ) * 100
+                result["VES"]["EUR"]["gap"] = round(gap, 2)
+
             return Response(result)
 
         except Currency.DoesNotExist:
-            return Response({"VES": {"USD": {"rates": {}}}})
+            return Response({
+                "VES": {
+                    "USD": {"rates": {}},
+                    "EUR": {"rates": {}}
+                }
+            })

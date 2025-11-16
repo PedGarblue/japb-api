@@ -1,11 +1,15 @@
 import requests
 from html.parser import HTMLParser
+import urllib3
+
+# Disable SSL warnings for BCV site
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 class _BcvEurParser(HTMLParser):
     def __init__(self):
         super().__init__()
-        self._target_depth = 0
+        self._in_euro_div = False
         self._in_strong = False
         self.value = None
 
@@ -13,16 +17,12 @@ class _BcvEurParser(HTMLParser):
         if tag == "div":
             attrs_dict = dict(attrs)
             if attrs_dict.get("id") == "euro":
-                self._target_depth = 1
-            elif self._target_depth:
-                self._target_depth += 1
-        elif tag == "strong" and self._target_depth:
+                self._in_euro_div = True
+        elif tag == "strong" and self._in_euro_div:
             self._in_strong = True
 
     def handle_endtag(self, tag):
-        if tag == "div" and self._target_depth:
-            self._target_depth -= 1
-        elif tag == "strong" and self._in_strong:
+        if tag == "strong" and self._in_strong:
             self._in_strong = False
 
     def handle_data(self, data):
@@ -38,7 +38,7 @@ class VesToEur:
     @staticmethod
     def getLatestRateBCV():
         try:
-            response = requests.get(VesToEur.BCV_URL, timeout=10)
+            response = requests.get(VesToEur.BCV_URL, timeout=10, verify=False)
         except requests.RequestException:
             return None
 

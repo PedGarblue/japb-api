@@ -14,6 +14,9 @@ def update_currency_historial():
             source="paralelo",
             rate=rate,
         )
+        print("VES to USD from Paralelo: Bs.{rate}")
+    else:
+        print("No rate found for VES to USD from paralelo source")
 
     rate_bcv = ves_to_usd.VesToUsd.getLatestRateBCV()
 
@@ -24,6 +27,9 @@ def update_currency_historial():
             source="bcv",
             rate=rate_bcv,
         )
+        print("VES to USD from BCV: Bs.{rate_bcv}")
+    else:
+        print("No rate found for VES to USD from BCV source")
 
     rate_bcv_eur = ves_to_eur.VesToEur.getLatestRateBCV()
 
@@ -34,3 +40,6 @@ def update_currency_historial():
             source="bcv",
             rate=rate_bcv_eur,
         )
+        print("VES to EUR from BCV: €{rate_bcv_eur}")
+    else:
+        print("No rate found for VES to EUR from BCV source")

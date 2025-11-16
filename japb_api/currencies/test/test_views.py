@@ -261,6 +261,7 @@ class TestCurrencyConversionViews(APITestCase):
         # Create required currencies
         self.usd_currency = Currency.objects.create(name="USD", symbol="$")
         self.ves_currency = Currency.objects.create(name="VES", symbol="Bs.")
+        self.eur_currency = Currency.objects.create(name="EUR", symbol="€")
 
     def test_api_get_currency_conversion_with_both_rates(self):
         """Test that the endpoint returns both paralelo and bcv rates when available with gap calculation"""
@@ -290,7 +291,10 @@ class TestCurrencyConversionViews(APITestCase):
                     "rates": {"bcv": 160.12, "paralelo": 260.13},
                     "gap": 38.45  # ((260.13 - 160.12) / 260.13) * 100 = 38.453, rounded to 2 places
                 }
-            }
+            },
+                "EUR": {
+                    "rates": {}
+                }
         }
 
         self.assertEqual(response.json(), expected_response)
@@ -309,7 +313,10 @@ class TestCurrencyConversionViews(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        expected_response = {"VES": {"USD": {"rates": {"paralelo": 260.13}}}}
+        expected_response = {
+            "VES": {"USD": {"rates": {"paralelo": 260.13}}},
+            "EUR": {"USD": {"rates": {}}}
+        }
 
         self.assertEqual(response.json(), expected_response)
 
@@ -327,7 +334,10 @@ class TestCurrencyConversionViews(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        expected_response = {"VES": {"USD": {"rates": {"bcv": 160.12}}}}
+        expected_response = {
+            "VES": {"USD": {"rates": {"bcv": 160.12}}},
+            "EUR": {"USD": {"rates": {}}}
+        }
 
         self.assertEqual(response.json(), expected_response)
 
@@ -338,7 +348,10 @@ class TestCurrencyConversionViews(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        expected_response = {"VES": {"USD": {"rates": {}}}}
+        expected_response = {
+            "VES": {"USD": {"rates": {}}},
+            "EUR": {"USD": {"rates": {}}}
+        }
 
         self.assertEqual(response.json(), expected_response)
 
@@ -352,7 +365,10 @@ class TestCurrencyConversionViews(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        expected_response = {"VES": {"USD": {"rates": {}}}}
+        expected_response = {
+            "VES": {"USD": {"rates": {}}},
+            "EUR": {"USD": {"rates": {}}}
+        }
 
         self.assertEqual(response.json(), expected_response)
 
@@ -366,7 +382,10 @@ class TestCurrencyConversionViews(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        expected_response = {"VES": {"USD": {"rates": {}}}}
+        expected_response = {
+            "VES": {"USD": {"rates": {}}},
+            "EUR": {"USD": {"rates": {}}}
+        }
 
         self.assertEqual(response.json(), expected_response)
 
@@ -387,6 +406,8 @@ class TestCurrencyConversionViews(APITestCase):
         response_data = response.json()
         self.assertNotIn("gap", response_data["VES"]["USD"])
         self.assertEqual(response_data["VES"]["USD"]["rates"]["paralelo"], 260.13)
+        # EUR should be present but empty
+        self.assertEqual(response_data["VES"]["EUR"]["rates"], {})
 
     def test_api_get_currency_conversion_latest_rates_only(self):
         """Test that the endpoint returns only the latest rates when multiple exist"""
@@ -445,6 +466,114 @@ class TestCurrencyConversionViews(APITestCase):
                     "rates": {"bcv": 160.12, "paralelo": 260.13},
                     "gap": 38.45  # ((260.13 - 160.12) / 260.13) * 100 = 38.453, rounded to 2 places
                 }
+            },
+                "EUR": {
+                    "rates": {}
+                }
+        }
+
+        self.assertEqual(response.json(), expected_response)
+
+    def test_api_get_currency_conversion_with_eur_bcv_rate(self):
+        """Test that the endpoint returns VES to EUR BCV rate when available"""
+        CurrencyConversionHistorial.objects.create(
+            currency_from=self.ves_currency,
+            currency_to=self.eur_currency,
+            source="bcv",
+            rate=210.12,
+        )
+
+        url = reverse("currency-conversion-list")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        expected_response = {
+            "VES": {
+                "USD": {"rates": {}},
+                "EUR": {"rates": {"bcv": 210.12}}
+            }
+        }
+
+        self.assertEqual(response.json(), expected_response)
+
+    def test_api_get_currency_conversion_eur_gap_not_included_without_paralelo(self):
+        """Test that EUR gap is not included when paralelo USD rate is not available"""
+        # Only create VES to EUR conversion, no paralelo USD rate
+        CurrencyConversionHistorial.objects.create(
+            currency_from=self.ves_currency,
+            currency_to=self.eur_currency,
+            source="bcv",
+            rate=210.12,
+        )
+
+        url = reverse("currency-conversion-list")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        response_data = response.json()
+        self.assertNotIn("gap", response_data["VES"]["EUR"])
+        self.assertEqual(response_data["VES"]["EUR"]["rates"]["bcv"], 210.12)
+
+    def test_api_get_currency_conversion_with_both_ves_and_eur_rates(self):
+        """Test that the endpoint returns both VES to USD and VES to EUR rates when available"""
+        # Create VES to USD conversions
+        CurrencyConversionHistorial.objects.create(
+            currency_from=self.ves_currency,
+            currency_to=self.usd_currency,
+            source="paralelo",
+            rate=260.13,
+        )
+        CurrencyConversionHistorial.objects.create(
+            currency_from=self.ves_currency,
+            currency_to=self.usd_currency,
+            source="bcv",
+            rate=160.12,
+        )
+
+        # Create VES to EUR conversion
+        CurrencyConversionHistorial.objects.create(
+            currency_from=self.ves_currency,
+            currency_to=self.eur_currency,
+            source="bcv",
+            rate=210.12,
+        )
+
+        url = reverse("currency-conversion-list")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        expected_response = {
+            "VES": {
+                "USD": {
+                    "rates": {"bcv": 160.12, "paralelo": 260.13},
+                    "gap": 38.45
+                },
+                "EUR": {
+                    "rates": {"bcv": 210.12},
+                    "gap": 19.23  # ((260.13 - 210.12) / 260.13) * 100 = 19.23
+                }
+            }
+        }
+
+        self.assertEqual(response.json(), expected_response)
+
+    def test_api_get_currency_conversion_missing_eur_currency(self):
+        """Test that the endpoint handles missing EUR currency gracefully"""
+        # Delete EUR currency
+        self.eur_currency.delete()
+
+        url = reverse("currency-conversion-list")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        expected_response = {
+            "VES": {
+                "USD": {"rates": {}},
+                "EUR": {"rates": {}}
             }
         }
 
