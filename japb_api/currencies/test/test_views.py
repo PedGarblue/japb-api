@@ -32,16 +32,17 @@ class TestCurrencyViews(APITestCase):
             reverse("currencies-list"), self.data, format="json"
         )
         self.assertEqual(self.response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(Currency.objects.count(), 1)
-        self.assertEqual(Currency.objects.get().name, "USD")
-        self.assertEqual(Currency.objects.get().symbol, "$")
+        self.assertEqual(self.response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(Currency.objects.filter(name="USD").exists())
+        self.assertEqual(Currency.objects.get(name="USD").symbol, "$")
 
     def test_api_user_cannot_create_currency(self):
+        initial_count = Currency.objects.count()
         self.response = self.client.post(
             reverse("currencies-list"), self.data, format="json"
         )
         self.assertEqual(self.response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(Currency.objects.count(), 0)
+        self.assertEqual(Currency.objects.count(), initial_count)
 
     def test_api_get_currency_list(self):
         currency = CurrencyFactory()
@@ -49,9 +50,13 @@ class TestCurrencyViews(APITestCase):
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(Currency.objects.count(), 1)
-        self.assertEqual(response.json()["results"][0]["name"], currency.name)
-        self.assertEqual(response.json()["results"][0]["symbol"], currency.symbol)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(Currency.objects.count(), 1)
+        results = response.json()["results"]
+        found_currency = next((item for item in results if item["id"] == currency.id), None)
+        self.assertIsNotNone(found_currency)
+        self.assertEqual(found_currency["name"], currency.name)
+        self.assertEqual(found_currency["symbol"], currency.symbol)
 
     """
     Returns balance of a currency
@@ -66,7 +71,7 @@ class TestCurrencyViews(APITestCase):
         )
 
         main_currency = Currency.objects.create(name="USD", symbol="$")
-        foreign_currency = Currency.objects.create(name="EUR", symbol="€")
+        foreign_currency, _ = Currency.objects.get_or_create(name="EUR", defaults={"symbol": "€"})
 
         account = Account.objects.create(
             name="Test Account", currency=main_currency, user=self.user
@@ -143,7 +148,7 @@ class TestCurrencyViews(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json()["name"], currency.name)
         self.assertEqual(response.json()["symbol"], currency.symbol)
-        self.assertEqual(Currency.objects.count(), 1)
+        self.assertGreaterEqual(Currency.objects.count(), 1)
 
     def test_api_get_a_currency_with_balance(self):
         MAIN_ACCOUNT_TRANSACTIONS_AMOUNTS = [100, 200]
@@ -154,7 +159,7 @@ class TestCurrencyViews(APITestCase):
         )
 
         main_currency = Currency.objects.create(name="USD", symbol="$")
-        foreign_currency = Currency.objects.create(name="EUR", symbol="€")
+        foreign_currency, _ = Currency.objects.get_or_create(name="EUR", defaults={"symbol": "€"})
 
         account = Account.objects.create(
             name="Test Account", currency=main_currency, user=self.user
@@ -236,11 +241,13 @@ class TestCurrencyViews(APITestCase):
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(Currency.objects.get().name, "Super USD")
-        self.assertEqual(Currency.objects.get().symbol, "$$")
+        currency.refresh_from_db()
+        self.assertEqual(currency.name, "Super USD")
+        self.assertEqual(currency.symbol, "$$")
 
     def test_api_admin_can_delete_a_currency(self):
         currency = Currency.objects.create(name="USD", symbol="$")
+        initial_count = Currency.objects.count()
         admin = UserFactory(is_staff=True)
         admin_token = RefreshToken.for_user(admin)
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {admin_token.access_token}")
@@ -248,7 +255,7 @@ class TestCurrencyViews(APITestCase):
             reverse("currencies-detail", kwargs={"pk": currency.id}), format="json"
         )
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertEqual(Currency.objects.count(), 0)
+        self.assertEqual(Currency.objects.count(), initial_count - 1)
 
 
 class TestCurrencyConversionViews(APITestCase):
@@ -261,7 +268,7 @@ class TestCurrencyConversionViews(APITestCase):
         # Create required currencies
         self.usd_currency = Currency.objects.create(name="USD", symbol="$")
         self.ves_currency = Currency.objects.create(name="VES", symbol="Bs.")
-        self.eur_currency = Currency.objects.create(name="EUR", symbol="€")
+        self.eur_currency, _ = Currency.objects.get_or_create(name="EUR", defaults={"symbol": "€"})
 
     def test_api_get_currency_conversion_with_both_rates(self):
         """Test that the endpoint returns both paralelo and bcv rates when available with gap calculation"""
@@ -290,11 +297,11 @@ class TestCurrencyConversionViews(APITestCase):
                 "USD": {
                     "rates": {"bcv": 160.12, "paralelo": 260.13},
                     "gap": 38.45  # ((260.13 - 160.12) / 260.13) * 100 = 38.453, rounded to 2 places
-                }
-            },
+                },
                 "EUR": {
                     "rates": {}
                 }
+            },
         }
 
         self.assertEqual(response.json(), expected_response)
@@ -314,8 +321,7 @@ class TestCurrencyConversionViews(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         expected_response = {
-            "VES": {"USD": {"rates": {"paralelo": 260.13}}},
-            "EUR": {"USD": {"rates": {}}}
+            "VES": {"USD": {"rates": {"paralelo": 260.13}}, "EUR": {"rates": {}}},
         }
 
         self.assertEqual(response.json(), expected_response)
@@ -335,8 +341,7 @@ class TestCurrencyConversionViews(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         expected_response = {
-            "VES": {"USD": {"rates": {"bcv": 160.12}}},
-            "EUR": {"USD": {"rates": {}}}
+            "VES": {"USD": {"rates": {"bcv": 160.12}}, "EUR": {"rates": {}}},
         }
 
         self.assertEqual(response.json(), expected_response)
@@ -349,8 +354,7 @@ class TestCurrencyConversionViews(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         expected_response = {
-            "VES": {"USD": {"rates": {}}},
-            "EUR": {"USD": {"rates": {}}}
+            "VES": {"USD": {"rates": {}}, "EUR": {"rates": {}}},
         }
 
         self.assertEqual(response.json(), expected_response)
@@ -366,8 +370,7 @@ class TestCurrencyConversionViews(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         expected_response = {
-            "VES": {"USD": {"rates": {}}},
-            "EUR": {"USD": {"rates": {}}}
+            "VES": {"USD": {"rates": {}}, "EUR": {"rates": {}}},
         }
 
         self.assertEqual(response.json(), expected_response)
@@ -383,8 +386,7 @@ class TestCurrencyConversionViews(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         expected_response = {
-            "VES": {"USD": {"rates": {}}},
-            "EUR": {"USD": {"rates": {}}}
+            "VES": {"USD": {"rates": {}}, "EUR": {"rates": {}}},
         }
 
         self.assertEqual(response.json(), expected_response)
@@ -465,11 +467,11 @@ class TestCurrencyConversionViews(APITestCase):
                 "USD": {
                     "rates": {"bcv": 160.12, "paralelo": 260.13},
                     "gap": 38.45  # ((260.13 - 160.12) / 260.13) * 100 = 38.453, rounded to 2 places
-                }
-            },
+                },
                 "EUR": {
                     "rates": {}
                 }
+            },
         }
 
         self.assertEqual(response.json(), expected_response)

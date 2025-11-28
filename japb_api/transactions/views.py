@@ -113,6 +113,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
             CurrencyConversionHistorial.objects.filter(
                 currency_from=account.currency,
                 currency_to__name="USD",
+                source=account.currency.default_conversion_source,
                 date__lte=serializer.initial_data.get("date"),
             )
             .order_by("-date")
@@ -177,32 +178,44 @@ class CurrencyExchangeViewSet(viewsets.ModelViewSet):
         to_decimal_places = account_to.decimal_places
         request.data["to_amount"] = parse_amount(to_amount, to_decimal_places)
 
+        # positive: comussion, negative value: profit
         comission_amount = request.data["from_amount"] - request.data["to_amount"]
 
+        # if from_amount is greater than to_amount, its a comission debited to from_account
+        # if to_amount is greater than from_amount, is a profit for to_account
+
         from_account_transaction_data = {
-            "amount": -float(request.data["from_amount"]) - (
-                -comission_amount if account_from.currency == account_to.currency else 0
+            "amount": -float(request.data["from_amount"])
+            - (
+                -comission_amount
+                if account_from.currency == account_to.currency and comission_amount > 0
+                else 0
             ),
             "account": request.data["from_account"],
             "description": description,
             "date": request.data["date"],
         }
         to_account_transaction_data = {
-            "amount": float(request.data["to_amount"]),
+            "amount": float(request.data["to_amount"])
+            + (
+                comission_amount
+                if account_from.currency == account_to.currency and comission_amount < 0
+                else 0
+            ),
             "account": request.data["to_account"],
             "description": description,
             "date": request.data["date"],
         }
 
         # check if categories "Exchanges" and "Exchanges Income exists"
-        try:
-            category_from = Category.objects.get(name="Exchanges")
-            category_to = Category.objects.get(name="Exchanges Income")
-            category_comission = Category.objects.get(name="Comissions")
-        except Category.DoesNotExist:
-            category_from = None
-            category_to = None
-            category_comission = None
+        # check if categories "Exchanges" and "Exchanges Income exists"
+        categories = Category.objects.filter(
+            Q(user=request.user) | Q(user__isnull=True)
+        )
+        category_from = categories.filter(name="Exchanges").first()
+        category_to = categories.filter(name="Exchanges Income").first()
+        category_comission = categories.filter(name="Comissions").first()
+        category_profit = categories.filter(name="Profits").first()
 
         if category_from:
             from_account_transaction_data["category"] = category_from.id
@@ -253,21 +266,25 @@ class CurrencyExchangeViewSet(viewsets.ModelViewSet):
             transaction_to_serializer.data,
         ]
         # Create the comission transaction
+        comission_description = "Comission" if comission_amount > 0 else "Profit"
+
         if account_from.currency == account_to.currency and comission_amount != 0:
             comission_transaction_data = {
-                "amount": request.data["to_amount"] - request.data["from_amount"],
-                "account": request.data["from_account"],
-                "description": f"Comission for {description}",
+                "amount": -comission_amount if comission_amount > 0 else comission_amount,
+                "account": request.data["from_account"]
+                if comission_amount > 0
+                else request.data["to_account"],
+                "description": f"{comission_description} for {description}",
                 "date": request.data["date"],
-                "type": "comission"
-                if request.data["from_amount"] >= request.data["to_amount"]
-                else "profit",
+                "type": "comission" if comission_amount > 0 else "profit",
                 "exchange_from": from_account_transaction.id,
                 "exchange_to": to_account_transaction.id,
                 "user": request.user.id,
             }
-            if category_comission:
-                comission_transaction_data["category"] = category_comission.id
+            if category_comission if comission_amount > 0 else category_profit:
+                comission_transaction_data["category"] = (
+                    category_comission if comission_amount > 0 else category_profit
+                ).id
 
             comission_transaction_serializer = ExchangeComissionSerializer(
                 data=comission_transaction_data
