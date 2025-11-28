@@ -33,6 +33,7 @@ class AccountSerializer(serializers.ModelSerializer):
         queryset = CurrencyConversionHistorial.objects.filter(
             currency_from=account.currency.id,
             currency_to=Currency.objects.get(name="USD"),
+            source=account.currency.default_conversion_source,
         )
         conversion = queryset.order_by("-date").first()
         if conversion:
