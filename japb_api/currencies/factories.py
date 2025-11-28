@@ -11,7 +11,7 @@ class CurrencyFactory(DjangoModelFactory):
     name = Faker(
         "currency_code"
     )  # Generates random currency codes like 'USD', 'EUR', etc.
-    symbol = Faker("currency_symbol")
+    symbol = Faker("pystr", max_chars=5)
 
 
 class CurrencyConversionHistorialFactory(DjangoModelFactory):
