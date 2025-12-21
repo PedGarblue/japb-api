@@ -1,4 +1,6 @@
+from datetime import timedelta, datetime
 from django.db.models import Q
+from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets, filters
 from rest_framework import serializers
@@ -7,9 +9,9 @@ from rest_framework.permissions import IsAuthenticated
 
 from .tasks import update_reports
 from ..accounts.models import Account
-from japb_api.currencies.models import CurrencyConversionHistorial
+from japb_api.currencies.models import CurrencyConversionHistorial, Currency
 from .permissions import IsOwnerOrReadOnly, IsOwner
-from .models import Transaction, CurrencyExchange, Category
+from .models import Transaction, CurrencyExchange, ExchangeComission, Category
 from .serializers import (
     TransactionSerializer,
     CurrencyExchangeSerializer,
@@ -348,3 +350,184 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         return super().destroy(request, *args, **kwargs)
+
+
+class ExpensesSummaryViewSet(viewsets.ViewSet):
+    permission_classes = (IsAuthenticated,)
+
+    def list(self, request):
+        """
+        Get expenses summary grouped by parent category.
+        Query parameter: period (7d, 1m, current_week, current_month)
+        - 7d: Last 7 days from now
+        - 1m: Last 30 days from now
+        - current_week: From start of current week (Monday) to now
+        - current_month: From start of current month to now
+        """
+        period = request.query_params.get("period", "7d")
+        
+        # Calculate date range
+        now = timezone.now()
+        if period == "1m":
+            from_date = now - timedelta(days=30)
+        elif period == "current_week":
+            # Get start of current week (Monday)
+            days_since_monday = now.weekday()  # Monday is 0, Sunday is 6
+            from_date = now - timedelta(days=days_since_monday)
+            # Set to start of day (00:00:00)
+            from_date = from_date.replace(hour=0, minute=0, second=0, microsecond=0)
+        elif period == "current_month":
+            # Get start of current month
+            from_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        else:  # default to 7d
+            from_date = now - timedelta(days=7)
+        
+        to_date = now
+        
+        # Get all expense transactions for the user in the date range
+        # Filter by expense category type if category exists
+        transactions = Transaction.objects.filter(
+            user=request.user,
+            amount__lt=0,  # expenses only
+            date__gte=from_date,
+            date__lte=to_date,
+        ).filter(
+            Q(category__type="expense") | Q(category__isnull=True)
+        ).select_related("account", "account__currency", "category", "category__parent_category")
+        
+        # Exclude same-currency exchanges (but keep commissions which are separate)
+        same_currency_exchange_ids = CurrencyExchange.objects.filter(
+            type__in=["from_same_currency", "to_same_currency"]
+        ).values_list("id", flat=True)
+        transactions = transactions.exclude(id__in=same_currency_exchange_ids)
+        
+        # Process transactions: convert to USD and group by category
+        category_totals = {}  # {parent_category_id: {id, name, total, children: {child_id: {id, name, total}}}}
+        malformed_transactions = []
+        usd_currency = Currency.objects.filter(name="USD").first()
+        
+        if not usd_currency:
+            return Response(
+                {"error": "USD currency not found in system"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+        for transaction in transactions:
+            # Check if it's a commission (should be included)
+            is_commission = False
+            try:
+                commission = transaction.exchangecomission
+                if commission.type != "comission":
+                    continue  # Skip profits
+                is_commission = True
+            except ExchangeComission.DoesNotExist:
+                pass
+            
+            # Skip if it's a same-currency exchange (double check)
+            try:
+                exchange = transaction.currencyexchange
+                if exchange.type in ["from_same_currency", "to_same_currency"]:
+                    continue
+            except CurrencyExchange.DoesNotExist:
+                pass
+            
+            # Convert to USD
+            usd_amount = None
+            
+            if transaction.account.currency.name == "USD":
+                # Direct conversion from integer to float
+                usd_amount = transaction.amount / (10 ** transaction.account.decimal_places)
+            elif transaction.to_main_currency_amount is not None:
+                # Use pre-calculated USD amount (stored as integer with 2 decimal places)
+                usd_amount = transaction.to_main_currency_amount / 100.0
+            else:
+                # Attempt conversion using CurrencyConversionHistorial
+                conversion = (
+                    CurrencyConversionHistorial.objects.filter(
+                        currency_from=transaction.account.currency,
+                        currency_to=usd_currency,
+                        source=transaction.account.currency.default_conversion_source,
+                        date__lte=transaction.date,
+                    )
+                    .order_by("-date")
+                    .first()
+                )
+                
+                if conversion:
+                    # Convert: amount / (10**decimal_places) / conversion.rate
+                    amount_float = transaction.amount / (10 ** transaction.account.decimal_places)
+                    usd_amount = amount_float / conversion.rate
+                else:
+                    # No conversion available - add to malformed
+                    malformed_transactions.append({
+                        "id": transaction.id,
+                        "description": transaction.description,
+                        "date": transaction.date.isoformat(),
+                        "amount": transaction.amount / (10 ** transaction.account.decimal_places),
+                        "currency": transaction.account.currency.name,
+                        "reason": "No conversion rate available",
+                    })
+                    continue
+            
+            # Get parent category
+            if transaction.category is None:
+                parent_category_id = None
+                parent_category_name = "Uncategorized"
+                child_category_id = None
+                child_category_name = None
+            elif transaction.category.parent_category is None:
+                # Category is a parent
+                parent_category_id = transaction.category.id
+                parent_category_name = transaction.category.name
+                child_category_id = None
+                child_category_name = None
+            else:
+                # Category has a parent
+                parent_category_id = transaction.category.parent_category.id
+                parent_category_name = transaction.category.parent_category.name
+                child_category_id = transaction.category.id
+                child_category_name = transaction.category.name
+            
+            # Initialize parent category if not exists
+            if parent_category_id not in category_totals:
+                category_totals[parent_category_id] = {
+                    "category_id": parent_category_id,
+                    "category_name": parent_category_name,
+                    "total_amount_usd": 0.0,
+                    "children": {},
+                }
+            
+            # Add to parent total
+            category_totals[parent_category_id]["total_amount_usd"] += abs(usd_amount)
+            
+            # If there's a child category, add to its total
+            if child_category_id is not None:
+                if child_category_id not in category_totals[parent_category_id]["children"]:
+                    category_totals[parent_category_id]["children"][child_category_id] = {
+                        "category_id": child_category_id,
+                        "category_name": child_category_name,
+                        "total_amount_usd": 0.0,
+                    }
+                category_totals[parent_category_id]["children"][child_category_id]["total_amount_usd"] += abs(usd_amount)
+        
+        # Format response
+        summary = []
+        for parent_id, parent_data in category_totals.items():
+            children_list = list(parent_data["children"].values())
+            summary.append({
+                "category_id": parent_data["category_id"],
+                "category_name": parent_data["category_name"],
+                "total_amount_usd": round(parent_data["total_amount_usd"], 2),
+                "children": children_list,
+            })
+        
+        # Sort by total_amount_usd descending
+        summary.sort(key=lambda x: x["total_amount_usd"], reverse=True)
+        
+        return Response({
+            "period": period,
+            "from_date": from_date.isoformat(),
+            "to_date": to_date.isoformat(),
+            "summary": summary,
+            "malformed_transactions": malformed_transactions,
+        })

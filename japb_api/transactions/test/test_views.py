@@ -1,13 +1,14 @@
 import pytz
 from faker import Faker
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from django.urls import reverse
+from django.utils import timezone as django_timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from ..models import Transaction, CurrencyExchange, ExchangeComission, Category, TransactionItem
-from ..factories import TransactionFactory, CategoryFactory
+from ..factories import TransactionFactory, CategoryFactory, ExchangeComissionFactory, CurrencyExchangeFactory
 from japb_api.users.models import User
 from japb_api.accounts.models import Account
 from japb_api.currencies.factories import (

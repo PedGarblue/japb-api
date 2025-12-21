@@ -8,7 +8,7 @@ from rest_framework_simplejwt.views import (TokenObtainPairView, TokenRefreshVie
 from .users.views import UserViewSet, UserCreateViewSet, LoggedUserViewSet
 from .currencies.views import CurrencyViewSet, CurrencyConversionViewSet
 from .accounts.views import AccountViewSet
-from .transactions.views import TransactionViewSet, CurrencyExchangeViewSet, CategoryViewSet
+from .transactions.views import TransactionViewSet, CurrencyExchangeViewSet, CategoryViewSet, ExpensesSummaryViewSet
 from .receivables.views import ReceivableViewSet
 from .reports.views import ReportAccountViewSet, ReportCurrencyViewSet
 from .products.views import ProductsViewSet, ProductsListViewSet, ProductListItemViewSet
@@ -23,6 +23,7 @@ router.register(r'accounts', AccountViewSet, basename='accounts')
 router.register(r'transactions', TransactionViewSet, basename='transactions')
 router.register(r'categories', CategoryViewSet, basename='categories')
 router.register(r'exchanges', CurrencyExchangeViewSet, basename='exchanges')
+router.register(r'expenses-summary', ExpensesSummaryViewSet, basename='expenses-summary')
 router.register(r'receivables', ReceivableViewSet, basename='receivables')
 
 router.register(r'reports', ReportAccountViewSet, basename='reports')
