@@ -153,13 +153,43 @@ class TransactionFilterSet(django_filters.FilterSet):
     start_date = django_filters.DateTimeFilter(field_name="date", lookup_expr="gte")
     end_date = django_filters.DateTimeFilter(field_name="date", lookup_expr="lte")
     account = django_filters.ModelChoiceFilter(queryset=Account.objects.all())
-    category = django_filters.ModelChoiceFilter(queryset=Category.objects.all())
+    category = django_filters.ModelChoiceFilter(
+        queryset=Category.objects.all(), method="filter_category"
+    )
+    exclude_children = django_filters.BooleanFilter(method="filter_exclude_children")
     exclude_same_currency_exchanges = django_filters.BooleanFilter(
         method="filter_exclude_same_currency_exchanges"
     )
     currency = django_filters.NumberFilter(
         field_name="account__currency", lookup_expr="exact"
     )
+
+    def filter_category(self, queryset, name, value):
+        if value:
+            # Check if exclude_children is set in the query parameters
+            exclude_children = False
+            # Try to get exclude_children from form data or raw data
+            if hasattr(self, "form") and hasattr(self.form, "data"):
+                exclude_children_str = self.form.data.get("exclude_children", "").lower()
+                exclude_children = exclude_children_str in ("true", "1", "yes")
+            elif hasattr(self, "data") and self.data:
+                exclude_children_str = self.data.get("exclude_children", "").lower()
+                exclude_children = exclude_children_str in ("true", "1", "yes")
+            
+            if exclude_children:
+                # Only include transactions with the exact category (no children)
+                queryset = queryset.filter(category=value)
+            else:
+                # Include transactions with the category or any of its children
+                child_categories = Category.objects.filter(parent_category=value)
+                category_ids = [value.id] + list(child_categories.values_list("id", flat=True))
+                queryset = queryset.filter(category__in=category_ids)
+        return queryset
+
+    def filter_exclude_children(self, queryset, name, value):
+        # This filter is handled within filter_category method
+        # We don't need to do anything here, but we keep it for the API
+        return queryset
 
     def filter_exclude_same_currency_exchanges(self, queryset, name, value):
         if value:
@@ -178,6 +208,7 @@ class TransactionFilterSet(django_filters.FilterSet):
             "end_date",
             "account",
             "category",
+            "exclude_children",
             "currency",
             "exclude_same_currency_exchanges",
         )

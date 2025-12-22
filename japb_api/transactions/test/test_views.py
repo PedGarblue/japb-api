@@ -474,8 +474,15 @@ class TestCurrencyTransaction(APITestCase):
     def test_api_get_transaction_by_category(self):
         # add transactions with different categories
         account = self.account
-        selected_category = Category.objects.create(
+        parent_category = Category.objects.create(
             name="Food", color="#000000", description="Food expenses", user=self.user
+        )
+        child_category = Category.objects.create(
+            name="Groceries",
+            color="#000000",
+            description="Groceries expenses",
+            parent_category=parent_category,
+            user=self.user,
         )
         other_category = Category.objects.create(
             name="Transport", color="#000000", description="Transport expenses", user=self.user
@@ -483,23 +490,23 @@ class TestCurrencyTransaction(APITestCase):
         transactions = [
             Transaction(
                 amount=10,
-                description="transaction 1",
+                description="transaction 1 - parent category",
                 account=account,
                 date=datetime(2023, 1, 1, tzinfo=pytz.UTC),
-                category=selected_category,
+                category=parent_category,
                 user=self.user,
             ),
             Transaction(
                 amount=30,
-                description="transaction 2",
+                description="transaction 2 - child category",
                 account=account,
                 date=datetime(2023, 3, 1, tzinfo=pytz.UTC),
-                category=selected_category,
+                category=child_category,
                 user=self.user,
             ),
             Transaction(
                 amount=40,
-                description="transaction 3",
+                description="transaction 3 - other category",
                 account=account,
                 date=datetime(2023, 3, 1, tzinfo=pytz.UTC),
                 category=other_category,
@@ -507,7 +514,7 @@ class TestCurrencyTransaction(APITestCase):
             ),
             Transaction(
                 amount=25,
-                description="transaction 4",
+                description="transaction 4 - no category",
                 account=account,
                 date=datetime(2023, 3, 1, tzinfo=pytz.UTC),
                 category=None,
@@ -516,16 +523,107 @@ class TestCurrencyTransaction(APITestCase):
         ]
         Transaction.objects.bulk_create(transactions)
 
-        url = reverse("transactions-list") + "?category=" + str(selected_category.id)
+        # Test default behavior: filtering by parent category includes children
+        url = reverse("transactions-list") + "?category=" + str(parent_category.id)
         response = self.client.get(url, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.json()["results"]), 2)
-        self.assertEqual(response.json()["results"][0]["description"], "transaction 2")
-        self.assertEqual(response.json()["results"][1]["description"], "transaction 1")
-        # Verify all returned transactions have the selected category
+        self.assertEqual(response.json()["results"][0]["description"], "transaction 2 - child category")
+        self.assertEqual(response.json()["results"][1]["description"], "transaction 1 - parent category")
+        # Verify all returned transactions have the parent or child category
+        category_ids = [parent_category.id, child_category.id]
         for result in response.json()["results"]:
-            self.assertEqual(result["category"], selected_category.id)
+            self.assertIn(result["category"], category_ids)
+
+    def test_api_get_transaction_by_category_exclude_children(self):
+        # Test exclude_children flag: filtering by parent category excludes children
+        account = self.account
+        parent_category = Category.objects.create(
+            name="Food", color="#000000", description="Food expenses", user=self.user
+        )
+        child_category = Category.objects.create(
+            name="Groceries",
+            color="#000000",
+            description="Groceries expenses",
+            parent_category=parent_category,
+            user=self.user,
+        )
+        transactions = [
+            Transaction(
+                amount=10,
+                description="transaction 1 - parent category",
+                account=account,
+                date=datetime(2023, 1, 1, tzinfo=pytz.UTC),
+                category=parent_category,
+                user=self.user,
+            ),
+            Transaction(
+                amount=30,
+                description="transaction 2 - child category",
+                account=account,
+                date=datetime(2023, 3, 1, tzinfo=pytz.UTC),
+                category=child_category,
+                user=self.user,
+            ),
+        ]
+        Transaction.objects.bulk_create(transactions)
+
+        # Test with exclude_children=true: should only return parent category transactions
+        url = (
+            reverse("transactions-list")
+            + "?category="
+            + str(parent_category.id)
+            + "&exclude_children=true"
+        )
+        response = self.client.get(url, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.json()["results"]), 1)
+        self.assertEqual(response.json()["results"][0]["description"], "transaction 1 - parent category")
+        self.assertEqual(response.json()["results"][0]["category"], parent_category.id)
+
+    def test_api_get_transaction_by_child_category(self):
+        # Test filtering by child category (should work normally, no children to include)
+        account = self.account
+        parent_category = Category.objects.create(
+            name="Food", color="#000000", description="Food expenses", user=self.user
+        )
+        child_category = Category.objects.create(
+            name="Groceries",
+            color="#000000",
+            description="Groceries expenses",
+            parent_category=parent_category,
+            user=self.user,
+        )
+        transactions = [
+            Transaction(
+                amount=10,
+                description="transaction 1 - parent category",
+                account=account,
+                date=datetime(2023, 1, 1, tzinfo=pytz.UTC),
+                category=parent_category,
+                user=self.user,
+            ),
+            Transaction(
+                amount=30,
+                description="transaction 2 - child category",
+                account=account,
+                date=datetime(2023, 3, 1, tzinfo=pytz.UTC),
+                category=child_category,
+                user=self.user,
+            ),
+        ]
+        Transaction.objects.bulk_create(transactions)
+
+        # Test filtering by child category: should only return that child category
+        url = reverse("transactions-list") + "?category=" + str(child_category.id)
+        response = self.client.get(url, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.json()["results"]), 1)
+        self.assertEqual(response.json()["results"][0]["description"], "transaction 2 - child category")
+        self.assertEqual(response.json()["results"][0]["category"], child_category.id)
 
     def test_api_get_transaction_by_exclude_same_currency_exchanges(self):
         # add transacions to the account
