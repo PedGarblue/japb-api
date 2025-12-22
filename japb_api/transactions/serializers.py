@@ -153,6 +153,7 @@ class TransactionFilterSet(django_filters.FilterSet):
     start_date = django_filters.DateTimeFilter(field_name="date", lookup_expr="gte")
     end_date = django_filters.DateTimeFilter(field_name="date", lookup_expr="lte")
     account = django_filters.ModelChoiceFilter(queryset=Account.objects.all())
+    category = django_filters.ModelChoiceFilter(queryset=Category.objects.all())
     exclude_same_currency_exchanges = django_filters.BooleanFilter(
         method="filter_exclude_same_currency_exchanges"
     )
@@ -176,6 +177,7 @@ class TransactionFilterSet(django_filters.FilterSet):
             "start_date",
             "end_date",
             "account",
+            "category",
             "currency",
             "exclude_same_currency_exchanges",
         )

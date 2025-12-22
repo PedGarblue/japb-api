@@ -471,6 +471,62 @@ class TestCurrencyTransaction(APITestCase):
         self.assertEqual(response.json()["results"][1]["description"], "transaction 2")
         self.assertEqual(response.json()["results"][2]["description"], "transaction 1")
 
+    def test_api_get_transaction_by_category(self):
+        # add transactions with different categories
+        account = self.account
+        selected_category = Category.objects.create(
+            name="Food", color="#000000", description="Food expenses", user=self.user
+        )
+        other_category = Category.objects.create(
+            name="Transport", color="#000000", description="Transport expenses", user=self.user
+        )
+        transactions = [
+            Transaction(
+                amount=10,
+                description="transaction 1",
+                account=account,
+                date=datetime(2023, 1, 1, tzinfo=pytz.UTC),
+                category=selected_category,
+                user=self.user,
+            ),
+            Transaction(
+                amount=30,
+                description="transaction 2",
+                account=account,
+                date=datetime(2023, 3, 1, tzinfo=pytz.UTC),
+                category=selected_category,
+                user=self.user,
+            ),
+            Transaction(
+                amount=40,
+                description="transaction 3",
+                account=account,
+                date=datetime(2023, 3, 1, tzinfo=pytz.UTC),
+                category=other_category,
+                user=self.user,
+            ),
+            Transaction(
+                amount=25,
+                description="transaction 4",
+                account=account,
+                date=datetime(2023, 3, 1, tzinfo=pytz.UTC),
+                category=None,
+                user=self.user,
+            ),
+        ]
+        Transaction.objects.bulk_create(transactions)
+
+        url = reverse("transactions-list") + "?category=" + str(selected_category.id)
+        response = self.client.get(url, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.json()["results"]), 2)
+        self.assertEqual(response.json()["results"][0]["description"], "transaction 2")
+        self.assertEqual(response.json()["results"][1]["description"], "transaction 1")
+        # Verify all returned transactions have the selected category
+        for result in response.json()["results"]:
+            self.assertEqual(result["category"], selected_category.id)
+
     def test_api_get_transaction_by_exclude_same_currency_exchanges(self):
         # add transacions to the account
         account = self.account
