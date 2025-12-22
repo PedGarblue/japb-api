@@ -278,17 +278,27 @@ class TestExpensesSummaryViewSet(APITestCase):
         self.assertEqual(data["malformed_transactions"][0]["currency"], "UNKNOWN")
         self.assertEqual(data["malformed_transactions"][0]["reason"], "No conversion rate available")
 
-    def test_expenses_summary_excludes_same_currency_exchanges(self):
-        """Test that same-currency exchanges are excluded"""
+    def test_expenses_summary_excludes_all_currency_exchanges(self):
+        """Test that all currency exchanges (same-currency and different-currency) are excluded"""
         now = django_timezone.now()
         # Create same-currency exchange
-        exchange = CurrencyExchange.objects.create(
+        same_currency_exchange = CurrencyExchange.objects.create(
             user=self.user,
             account=self.usd_account,
             amount=-5000,
             description="Same Currency Exchange",
             date=now - timedelta(days=1),
             type="from_same_currency",
+            category=self.parent_category,
+        )
+        # Create different-currency exchange
+        different_currency_exchange = CurrencyExchange.objects.create(
+            user=self.user,
+            account=self.ves_account,
+            amount=-60000,
+            description="Different Currency Exchange",
+            date=now - timedelta(days=1),
+            type="from_different_currency",
             category=self.parent_category,
         )
         # Create regular expense
@@ -306,7 +316,7 @@ class TestExpensesSummaryViewSet(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.json()
-        # Should only include regular expense, not the exchange
+        # Should only include regular expense, not any exchanges
         self.assertEqual(data["summary"][0]["total_amount_usd"], 30.0)
 
     def test_expenses_summary_includes_commissions(self):
@@ -623,28 +633,40 @@ class TestExpensesSummaryViewSet(APITestCase):
 
     def test_expenses_summary_current_week(self):
         """Test expenses summary with current week period"""
-        now = django_timezone.now()
-        # Calculate start of current week (Monday)
-        days_since_monday = now.weekday()  # Monday is 0, Sunday is 6
-        week_start = now - timedelta(days=days_since_monday)
-        week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
+        test_now = django_timezone.now()
+        days_since_monday = test_now.weekday()
+        current_week_monday = test_now - timedelta(days=days_since_monday)
+        current_week_monday = current_week_monday.replace(hour=0, minute=0, second=0, microsecond=0)
         
-        # Create transaction within current week
+        if days_since_monday == 0:
+            transaction_date = test_now - timedelta(minutes=10)
+            if transaction_date < current_week_monday:
+                transaction_date = current_week_monday + timedelta(minutes=5)
+                if transaction_date >= test_now:
+                    transaction_date = test_now - timedelta(minutes=1)
+                    if transaction_date < current_week_monday:
+                        transaction_date = current_week_monday + timedelta(seconds=1)
+        elif days_since_monday == 6:
+            transaction_date = current_week_monday + timedelta(days=2, hours=12)
+        else:
+            transaction_date = test_now - timedelta(days=1)
+            if transaction_date < current_week_monday:
+                transaction_date = current_week_monday + timedelta(days=1, hours=12)
+        
         Transaction.objects.create(
             user=self.user,
             account=self.usd_account,
-            amount=-5000,  # -50.00 USD
+            amount=-5000,
             description="Current Week Expense",
-            date=week_start + timedelta(days=1),
+            date=transaction_date,
             category=self.parent_category,
         )
-        # Create transaction before current week (should be excluded)
         Transaction.objects.create(
             user=self.user,
             account=self.usd_account,
-            amount=-10000,  # -100.00 USD
+            amount=-10000,
             description="Previous Week Expense",
-            date=week_start - timedelta(days=1),
+            date=current_week_monday - timedelta(days=1),
             category=self.parent_category,
         )
 
@@ -654,8 +676,14 @@ class TestExpensesSummaryViewSet(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.json()
         self.assertEqual(data["period"], "current_week")
-        # Should only include transaction from current week
-        self.assertEqual(len(data["summary"]), 1)
+        
+        self.assertEqual(len(data["summary"]), 1, 
+                        f"Expected 1 summary item, got {len(data['summary'])}. "
+                        f"Transaction date: {transaction_date}, "
+                        f"API from_date: {data.get('from_date')}, "
+                        f"API to_date: {data.get('to_date')}, "
+                        f"Current week Monday: {current_week_monday}, "
+                        f"Days since Monday: {days_since_monday}")
         self.assertEqual(data["summary"][0]["total_amount_usd"], 50.0)
 
     def test_expenses_summary_current_month(self):

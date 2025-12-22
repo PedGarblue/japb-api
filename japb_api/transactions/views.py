@@ -395,11 +395,10 @@ class ExpensesSummaryViewSet(viewsets.ViewSet):
             Q(category__type="expense") | Q(category__isnull=True)
         ).select_related("account", "account__currency", "category", "category__parent_category")
         
-        # Exclude same-currency exchanges (but keep commissions which are separate)
-        same_currency_exchange_ids = CurrencyExchange.objects.filter(
-            type__in=["from_same_currency", "to_same_currency"]
-        ).values_list("id", flat=True)
-        transactions = transactions.exclude(id__in=same_currency_exchange_ids)
+        # Exclude all currency exchanges (same-currency and different-currency)
+        # since amounts are always calculated as USD, exchanges should be omitted
+        exchange_ids = CurrencyExchange.objects.all().values_list("id", flat=True)
+        transactions = transactions.exclude(id__in=exchange_ids)
         
         # Process transactions: convert to USD and group by category
         category_totals = {}  # {parent_category_id: {id, name, total, children: {child_id: {id, name, total}}}}
@@ -423,11 +422,10 @@ class ExpensesSummaryViewSet(viewsets.ViewSet):
             except ExchangeComission.DoesNotExist:
                 pass
             
-            # Skip if it's a same-currency exchange (double check)
+            # Skip if it's a currency exchange (double check - all exchanges should be excluded)
             try:
-                exchange = transaction.currencyexchange
-                if exchange.type in ["from_same_currency", "to_same_currency"]:
-                    continue
+                transaction.currencyexchange
+                continue  # Skip all currency exchanges
             except CurrencyExchange.DoesNotExist:
                 pass
             
