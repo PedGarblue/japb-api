@@ -522,10 +522,14 @@ class ExpensesSummaryViewSet(viewsets.ViewSet):
         # Sort by total_amount_usd descending
         summary.sort(key=lambda x: x["total_amount_usd"], reverse=True)
         
+        # Calculate total for the period (sum of all category totals)
+        period_total = sum(category["total_amount_usd"] for category in summary)
+        
         return Response({
             "period": period,
             "from_date": from_date.isoformat(),
             "to_date": to_date.isoformat(),
+            "total": round(period_total, 2),
             "summary": summary,
             "malformed_transactions": malformed_transactions,
         })

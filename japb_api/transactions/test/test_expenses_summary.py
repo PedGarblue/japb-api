@@ -721,3 +721,268 @@ class TestExpensesSummaryViewSet(APITestCase):
         self.assertEqual(len(data["summary"]), 1)
         self.assertEqual(data["summary"][0]["total_amount_usd"], 50.0)
 
+    def test_expenses_summary_total_field_single_category(self):
+        """Test that total field is present and correct for single category"""
+        now = django_timezone.now()
+        Transaction.objects.create(
+            user=self.user,
+            account=self.usd_account,
+            amount=-5000,  # -50.00 USD
+            description="USD Expense",
+            date=now - timedelta(days=1),
+            category=self.parent_category,
+        )
+        Transaction.objects.create(
+            user=self.user,
+            account=self.usd_account,
+            amount=-3000,  # -30.00 USD
+            description="USD Expense 2",
+            date=now - timedelta(days=1),
+            category=self.child_category,
+        )
+
+        url = reverse("expenses-summary-list")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()
+        # Total should be sum of all category totals: 50 + 30 = 80
+        self.assertIn("total", data)
+        self.assertEqual(data["total"], 80.0)
+        self.assertEqual(data["summary"][0]["total_amount_usd"], 80.0)
+
+    def test_expenses_summary_total_field_multiple_categories(self):
+        """Test that total field correctly sums multiple categories"""
+        now = django_timezone.now()
+        # Create transactions in different categories
+        Transaction.objects.create(
+            user=self.user,
+            account=self.usd_account,
+            amount=-10000,  # -100.00 USD
+            description="Food Expense",
+            date=now - timedelta(days=1),
+            category=self.parent_category,
+        )
+        Transaction.objects.create(
+            user=self.user,
+            account=self.usd_account,
+            amount=-5000,  # -50.00 USD
+            description="Transportation Expense",
+            date=now - timedelta(days=1),
+            category=self.other_category,
+        )
+        Transaction.objects.create(
+            user=self.user,
+            account=self.usd_account,
+            amount=-2000,  # -20.00 USD
+            description="Uncategorized Expense",
+            date=now - timedelta(days=1),
+            category=None,
+        )
+
+        url = reverse("expenses-summary-list")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()
+        # Total should be sum of all categories: 100 + 50 + 20 = 170
+        self.assertIn("total", data)
+        self.assertEqual(data["total"], 170.0)
+        # Verify individual category totals
+        category_totals = [cat["total_amount_usd"] for cat in data["summary"]]
+        self.assertEqual(sum(category_totals), 170.0)
+
+    def test_expenses_summary_total_field_with_commissions(self):
+        """Test that total field includes commissions"""
+        now = django_timezone.now()
+        # Create exchange transactions for commission
+        exchange_from = CurrencyExchange.objects.create(
+            user=self.user,
+            account=self.usd_account,
+            amount=-10000,
+            description="Exchange From",
+            date=now - timedelta(days=1),
+            type="from_same_currency",
+            category=None,
+        )
+        exchange_to = CurrencyExchange.objects.create(
+            user=self.user,
+            account=self.usd_account,
+            amount=9500,
+            description="Exchange To",
+            date=now - timedelta(days=1),
+            type="to_same_currency",
+            category=None,
+        )
+        # Create commission
+        ExchangeComission.objects.create(
+            user=self.user,
+            account=self.usd_account,
+            amount=-500,  # -5.00 USD commission
+            description="Commission",
+            date=now - timedelta(days=1),
+            type="comission",
+            exchange_from=exchange_from,
+            exchange_to=exchange_to,
+            category=self.parent_category,
+        )
+        # Create regular expense
+        Transaction.objects.create(
+            user=self.user,
+            account=self.usd_account,
+            amount=-3000,  # -30.00 USD
+            description="Regular Expense",
+            date=now - timedelta(days=1),
+            category=self.parent_category,
+        )
+
+        url = reverse("expenses-summary-list")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()
+        # Total should include both commission and regular expense: 5 + 30 = 35
+        self.assertIn("total", data)
+        self.assertEqual(data["total"], 35.0)
+
+    def test_expenses_summary_total_field_excludes_profits(self):
+        """Test that total field excludes profits"""
+        now = django_timezone.now()
+        # Create exchange transactions
+        exchange_from = CurrencyExchange.objects.create(
+            user=self.user,
+            account=self.usd_account,
+            amount=-10000,
+            description="Exchange From",
+            date=now - timedelta(days=1),
+            type="from_same_currency",
+            category=None,
+        )
+        exchange_to = CurrencyExchange.objects.create(
+            user=self.user,
+            account=self.usd_account,
+            amount=10500,
+            description="Exchange To",
+            date=now - timedelta(days=1),
+            type="to_same_currency",
+            category=None,
+        )
+        # Create profit (should be excluded)
+        ExchangeComission.objects.create(
+            user=self.user,
+            account=self.usd_account,
+            amount=500,  # Positive amount (profit)
+            description="Profit",
+            date=now - timedelta(days=1),
+            type="profit",
+            exchange_from=exchange_from,
+            exchange_to=exchange_to,
+            category=self.parent_category,
+        )
+        # Create regular expense
+        Transaction.objects.create(
+            user=self.user,
+            account=self.usd_account,
+            amount=-2000,  # -20.00 USD
+            description="Regular Expense",
+            date=now - timedelta(days=1),
+            category=self.parent_category,
+        )
+
+        url = reverse("expenses-summary-list")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()
+        # Total should only include regular expense, not profit: 20
+        self.assertIn("total", data)
+        self.assertEqual(data["total"], 20.0)
+
+    def test_expenses_summary_total_field_multiple_currencies(self):
+        """Test that total field correctly sums expenses in multiple currencies"""
+        now = django_timezone.now()
+        # USD transaction
+        Transaction.objects.create(
+            user=self.user,
+            account=self.usd_account,
+            amount=-5000,  # -50.00 USD
+            description="USD Expense",
+            date=now - timedelta(days=1),
+            category=self.parent_category,
+        )
+        # VES transaction with conversion
+        Transaction.objects.create(
+            user=self.user,
+            account=self.ves_account,
+            amount=-60000,  # -600.00 VES = -10.00 USD (rate 60)
+            description="VES Expense",
+            date=now - timedelta(days=1),
+            category=self.parent_category,
+        )
+        # EUR transaction with conversion
+        Transaction.objects.create(
+            user=self.user,
+            account=self.eur_account,
+            amount=-11000,  # -110.00 EUR = -100.00 USD (rate 1.1)
+            description="EUR Expense",
+            date=now - timedelta(days=1),
+            category=self.parent_category,
+        )
+
+        url = reverse("expenses-summary-list")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()
+        # Total: 50 + 10 + 100 = 160 USD
+        self.assertIn("total", data)
+        self.assertEqual(data["total"], 160.0)
+
+    def test_expenses_summary_total_field_different_periods(self):
+        """Test that total field works correctly with different periods"""
+        now = django_timezone.now()
+        # Create transactions in different time periods
+        Transaction.objects.create(
+            user=self.user,
+            account=self.usd_account,
+            amount=-5000,  # -50.00 USD (within 7 days)
+            description="Recent Expense",
+            date=now - timedelta(days=3),
+            category=self.parent_category,
+        )
+        Transaction.objects.create(
+            user=self.user,
+            account=self.usd_account,
+            amount=-10000,  # -100.00 USD (within 30 days but not 7)
+            description="Older Expense",
+            date=now - timedelta(days=15),
+            category=self.parent_category,
+        )
+
+        # Test 7d period
+        url = reverse("expenses-summary-list") + "?period=7d"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()
+        self.assertIn("total", data)
+        self.assertEqual(data["total"], 50.0)
+
+        # Test 1m period
+        url = reverse("expenses-summary-list") + "?period=1m"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()
+        self.assertIn("total", data)
+        self.assertEqual(data["total"], 150.0)  # 50 + 100
+
+    def test_expenses_summary_total_field_empty_summary(self):
+        """Test that total field is 0 when there are no expenses"""
+        url = reverse("expenses-summary-list")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()
+        self.assertIn("total", data)
+        self.assertEqual(data["total"], 0.0)
+        self.assertEqual(len(data["summary"]), 0)
+
