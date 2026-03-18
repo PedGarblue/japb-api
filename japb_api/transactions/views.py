@@ -1,4 +1,5 @@
-from datetime import timedelta, datetime
+import calendar
+from datetime import timedelta, datetime, date, time
 from django.db.models import Q
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
@@ -20,6 +21,7 @@ from .serializers import (
     TransactionFilterSet,
 )
 from japb_api.products.tasks import update_user_product_list_items
+from .utils import convert_transaction_to_usd, should_skip_transaction
 
 def parse_amount(amount, decimal_places):
     return int(amount * (10**decimal_places))
@@ -412,61 +414,14 @@ class ExpensesSummaryViewSet(viewsets.ViewSet):
             )
         
         for transaction in transactions:
-            # Check if it's a commission (should be included)
-            is_commission = False
-            try:
-                commission = transaction.exchangecomission
-                if commission.type != "comission":
-                    continue  # Skip profits
-                is_commission = True
-            except ExchangeComission.DoesNotExist:
-                pass
-            
-            # Skip if it's a currency exchange (double check - all exchanges should be excluded)
-            try:
-                transaction.currencyexchange
-                continue  # Skip all currency exchanges
-            except CurrencyExchange.DoesNotExist:
-                pass
-            
-            # Convert to USD
-            usd_amount = None
-            
-            if transaction.account.currency.name == "USD":
-                # Direct conversion from integer to float
-                usd_amount = transaction.amount / (10 ** transaction.account.decimal_places)
-            elif transaction.to_main_currency_amount is not None:
-                # Use pre-calculated USD amount (stored as integer with 2 decimal places)
-                usd_amount = transaction.to_main_currency_amount / 100.0
-            else:
-                # Attempt conversion using CurrencyConversionHistorial
-                conversion = (
-                    CurrencyConversionHistorial.objects.filter(
-                        currency_from=transaction.account.currency,
-                        currency_to=usd_currency,
-                        source=transaction.account.currency.default_conversion_source,
-                        date__lte=transaction.date,
-                    )
-                    .order_by("-date")
-                    .first()
-                )
-                
-                if conversion:
-                    # Convert: amount / (10**decimal_places) / conversion.rate
-                    amount_float = transaction.amount / (10 ** transaction.account.decimal_places)
-                    usd_amount = amount_float / conversion.rate
-                else:
-                    # No conversion available - add to malformed
-                    malformed_transactions.append({
-                        "id": transaction.id,
-                        "description": transaction.description,
-                        "date": transaction.date.isoformat(),
-                        "amount": transaction.amount / (10 ** transaction.account.decimal_places),
-                        "currency": transaction.account.currency.name,
-                        "reason": "No conversion rate available",
-                    })
-                    continue
-            
+            if should_skip_transaction(transaction):
+                continue
+
+            usd_amount, error_info = convert_transaction_to_usd(transaction, usd_currency)
+            if error_info:
+                malformed_transactions.append(error_info)
+                continue
+
             # Get parent category
             if transaction.category is None:
                 parent_category_id = None
@@ -533,3 +488,215 @@ class ExpensesSummaryViewSet(viewsets.ViewSet):
             "summary": summary,
             "malformed_transactions": malformed_transactions,
         })
+
+
+class CategoryTrendViewSet(viewsets.ViewSet):
+    permission_classes = (IsAuthenticated,)
+
+    def list(self, request):
+        category_id_str = request.query_params.get("category")
+        start_date_str = request.query_params.get("start_date")
+        end_date_str = request.query_params.get("end_date")
+        granularity = request.query_params.get("granularity", "monthly")
+        exclude_str = request.query_params.get("exclude_categories", "")
+        include_str = request.query_params.get("include_categories", "")
+
+        if not category_id_str or not start_date_str or not end_date_str:
+            return Response(
+                {"error": "category, start_date, and end_date are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if granularity not in ("monthly", "weekly"):
+            return Response(
+                {"error": "granularity must be 'monthly' or 'weekly'"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            start_dt = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+            end_dt = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            return Response(
+                {"error": "Invalid date format. Use YYYY-MM-DD"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if start_dt > end_dt:
+            return Response(
+                {"error": "start_date must be before or equal to end_date"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            category = Category.objects.get(pk=int(category_id_str))
+        except (Category.DoesNotExist, ValueError, TypeError):
+            return Response(
+                {"error": "Category not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Build effective category set: parent + children - excluded + included
+        child_ids = set(
+            Category.objects.filter(parent_category=category).values_list("id", flat=True)
+        )
+
+        if exclude_str:
+            try:
+                exclude_ids = {int(x.strip()) for x in exclude_str.split(",") if x.strip()}
+            except ValueError:
+                return Response(
+                    {"error": "exclude_categories must be comma-separated integers"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            child_ids -= exclude_ids
+
+        category_ids = {category.id} | child_ids
+
+        if include_str:
+            try:
+                include_ids = [int(x.strip()) for x in include_str.split(",") if x.strip()]
+            except ValueError:
+                return Response(
+                    {"error": "include_categories must be comma-separated integers"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            found = Category.objects.filter(pk__in=include_ids)
+            if found.count() != len(set(include_ids)):
+                found_ids = set(found.values_list("id", flat=True))
+                missing = set(include_ids) - found_ids
+                return Response(
+                    {"error": f"Categories not found: {missing}"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            category_ids |= set(include_ids)
+
+        # Query expense transactions scoped to the effective category set
+        start_datetime = timezone.make_aware(datetime.combine(start_dt, time.min))
+        end_datetime = timezone.make_aware(datetime.combine(end_dt, time.max))
+
+        transactions = (
+            Transaction.objects.filter(
+                user=request.user,
+                amount__lt=0,
+                date__gte=start_datetime,
+                date__lte=end_datetime,
+                category__in=category_ids,
+            )
+            .select_related("account", "account__currency", "category")
+        )
+
+        exchange_ids = CurrencyExchange.objects.all().values_list("id", flat=True)
+        transactions = transactions.exclude(id__in=exchange_ids)
+
+        # Generate period buckets
+        periods, period_map = self._generate_periods(start_dt, end_dt, granularity)
+
+        usd_currency = Currency.objects.filter(name="USD").first()
+        if not usd_currency:
+            return Response(
+                {"error": "USD currency not found in system"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        malformed_transactions = []
+
+        for transaction in transactions:
+            if should_skip_transaction(transaction):
+                continue
+
+            usd_amount, error_info = convert_transaction_to_usd(transaction, usd_currency)
+            if error_info:
+                malformed_transactions.append(error_info)
+                continue
+
+            tx_date = transaction.date.date()
+            if granularity == "monthly":
+                key = (tx_date.year, tx_date.month)
+            else:
+                key = tx_date - timedelta(days=tx_date.weekday())
+
+            if key not in period_map:
+                continue
+
+            idx = period_map[key]
+            periods[idx]["total_amount_usd"] += abs(usd_amount)
+
+            cat_id = transaction.category_id
+            if cat_id != category.id:
+                if cat_id not in periods[idx]["children"]:
+                    periods[idx]["children"][cat_id] = {
+                        "category_id": cat_id,
+                        "category_name": transaction.category.name,
+                        "total_amount_usd": 0.0,
+                    }
+                periods[idx]["children"][cat_id]["total_amount_usd"] += abs(usd_amount)
+
+        grand_total = 0.0
+        for period in periods:
+            period["total_amount_usd"] = round(period["total_amount_usd"], 2)
+            children_list = sorted(
+                period["children"].values(),
+                key=lambda c: c["total_amount_usd"],
+                reverse=True,
+            )
+            for child in children_list:
+                child["total_amount_usd"] = round(child["total_amount_usd"], 2)
+            period["children"] = children_list
+            grand_total += period["total_amount_usd"]
+
+        return Response({
+            "category_id": category.id,
+            "category_name": category.name,
+            "start_date": start_dt.isoformat(),
+            "end_date": end_dt.isoformat(),
+            "granularity": granularity,
+            "periods": periods,
+            "grand_total_usd": round(grand_total, 2),
+            "malformed_transactions": malformed_transactions,
+        })
+
+    @staticmethod
+    def _generate_periods(start_dt, end_dt, granularity):
+        periods = []
+        period_map = {}
+
+        if granularity == "monthly":
+            current = start_dt.replace(day=1)
+            idx = 0
+            while current <= end_dt:
+                last_day = calendar.monthrange(current.year, current.month)[1]
+                p_start = max(current, start_dt)
+                p_end = min(date(current.year, current.month, last_day), end_dt)
+                periods.append({
+                    "period_start": p_start.isoformat(),
+                    "period_end": p_end.isoformat(),
+                    "label": f"{current.year}-{current.month:02d}",
+                    "total_amount_usd": 0.0,
+                    "children": {},
+                })
+                period_map[(current.year, current.month)] = idx
+                idx += 1
+                if current.month == 12:
+                    current = date(current.year + 1, 1, 1)
+                else:
+                    current = date(current.year, current.month + 1, 1)
+        else:
+            current_monday = start_dt - timedelta(days=start_dt.weekday())
+            idx = 0
+            while current_monday <= end_dt:
+                p_start = max(current_monday, start_dt)
+                p_end = min(current_monday + timedelta(days=6), end_dt)
+                iso_year, iso_week, _ = current_monday.isocalendar()
+                periods.append({
+                    "period_start": p_start.isoformat(),
+                    "period_end": p_end.isoformat(),
+                    "label": f"{iso_year}-W{iso_week:02d}",
+                    "total_amount_usd": 0.0,
+                    "children": {},
+                })
+                period_map[current_monday] = idx
+                idx += 1
+                current_monday += timedelta(days=7)
+
+        return periods, period_map
