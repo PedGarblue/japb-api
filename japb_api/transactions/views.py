@@ -490,6 +490,114 @@ class ExpensesSummaryViewSet(viewsets.ViewSet):
         })
 
 
+class CashflowSummaryViewSet(viewsets.ViewSet):
+    """
+    Income and expense totals in USD plus net cash flow (income minus expenses).
+
+    Query parameter: period — current_month (default), this_quarter, this_year.
+    free_cash_flow_usd is net cash flow for personal finance (not corporate FCF).
+    """
+
+    permission_classes = (IsAuthenticated,)
+
+    @staticmethod
+    def _period_bounds(period, now):
+        if period == "current_month":
+            from_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        elif period == "this_quarter":
+            quarter_start_month = ((now.month - 1) // 3) * 3 + 1
+            from_date = now.replace(
+                month=quarter_start_month,
+                day=1,
+                hour=0,
+                minute=0,
+                second=0,
+                microsecond=0,
+            )
+        elif period == "this_year":
+            from_date = now.replace(
+                month=1, day=1, hour=0, minute=0, second=0, microsecond=0
+            )
+        else:
+            return None
+        return from_date, now
+
+    @staticmethod
+    def _accumulate_usd_totals(transactions, usd_currency, expense_mode):
+        total = 0.0
+        malformed_transactions = []
+        for transaction in transactions:
+            if should_skip_transaction(transaction):
+                continue
+            usd_amount, error_info = convert_transaction_to_usd(transaction, usd_currency)
+            if error_info:
+                malformed_transactions.append(error_info)
+                continue
+            if expense_mode:
+                total += abs(usd_amount)
+            elif usd_amount > 0:
+                total += usd_amount
+        return total, malformed_transactions
+
+    def list(self, request):
+        period = request.query_params.get("period", "current_month")
+        bounds = self._period_bounds(period, timezone.now())
+        if bounds is None:
+            return Response(
+                {
+                    "error": "period must be one of: current_month, this_quarter, this_year",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        from_date, to_date = bounds
+
+        exchange_ids = CurrencyExchange.objects.all().values_list("id", flat=True)
+        base_qs = (
+            Transaction.objects.filter(
+                user=request.user,
+                date__gte=from_date,
+                date__lte=to_date,
+            )
+            .exclude(id__in=exchange_ids)
+            .select_related("account", "account__currency", "category")
+        )
+
+        expenses_qs = base_qs.filter(amount__lt=0).filter(
+            Q(category__type="expense") | Q(category__isnull=True)
+        )
+        income_qs = base_qs.filter(amount__gt=0).filter(
+            Q(category__type="income") | Q(category__isnull=True)
+        )
+
+        usd_currency = Currency.objects.filter(name="USD").first()
+        if not usd_currency:
+            return Response(
+                {"error": "USD currency not found in system"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        expense_total, malformed_expenses = self._accumulate_usd_totals(
+            expenses_qs, usd_currency, expense_mode=True
+        )
+        income_total, malformed_income = self._accumulate_usd_totals(
+            income_qs, usd_currency, expense_mode=False
+        )
+        malformed_transactions = malformed_expenses + malformed_income
+        free_cash_flow = income_total - expense_total
+
+        return Response(
+            {
+                "period": period,
+                "from_date": from_date.isoformat(),
+                "to_date": to_date.isoformat(),
+                "income_total_usd": round(income_total, 2),
+                "expense_total_usd": round(expense_total, 2),
+                "free_cash_flow_usd": round(free_cash_flow, 2),
+                "malformed_transactions": malformed_transactions,
+            }
+        )
+
+
 class CategoryTrendViewSet(viewsets.ViewSet):
     permission_classes = (IsAuthenticated,)
 
