@@ -35,6 +35,36 @@ class TestCurrencyViews(APITestCase):
         self.assertEqual(self.response.status_code, status.HTTP_201_CREATED)
         self.assertTrue(Currency.objects.filter(name="USD").exists())
         self.assertEqual(Currency.objects.get(name="USD").symbol, "$")
+        self.assertEqual(Currency.objects.get(name="USD").asset_kind, "fiat")
+        self.assertEqual(Currency.objects.get(name="USD").default_decimal_places, 2)
+
+    def test_api_admin_can_create_crypto_currency(self):
+        admin = UserFactory(is_staff=True)
+        token = RefreshToken.for_user(admin)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token.access_token}")
+        response = self.client.post(
+            reverse("currencies-list"),
+            {"name": "BTC", "symbol": "₿", "asset_kind": "crypto"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Currency.objects.get(name="BTC").asset_kind, "crypto")
+        self.assertEqual(Currency.objects.get(name="BTC").default_decimal_places, 8)
+
+    def test_api_currency_list_filter_by_asset_kind(self):
+        Currency.objects.create(name="FILTER_FIAT", symbol="$", asset_kind="fiat")
+        Currency.objects.create(
+            name="FILTER_BTC",
+            symbol="₿",
+            asset_kind="crypto",
+            default_decimal_places=8,
+        )
+        url = reverse("currencies-list")
+        response = self.client.get(url, {"asset_kind": "crypto"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = {item["name"] for item in response.json()["results"]}
+        self.assertIn("FILTER_BTC", names)
+        self.assertNotIn("FILTER_FIAT", names)
 
     def test_api_user_cannot_create_currency(self):
         initial_count = Currency.objects.count()
@@ -57,6 +87,8 @@ class TestCurrencyViews(APITestCase):
         self.assertIsNotNone(found_currency)
         self.assertEqual(found_currency["name"], currency.name)
         self.assertEqual(found_currency["symbol"], currency.symbol)
+        self.assertEqual(found_currency["asset_kind"], "fiat")
+        self.assertEqual(found_currency["default_decimal_places"], 2)
 
     """
     Returns balance of a currency
@@ -130,11 +162,14 @@ class TestCurrencyViews(APITestCase):
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.json()["results"][1]["id"], main_currency.id)
-        self.assertEqual(response.json()["results"][1]["name"], "USD")
-        self.assertEqual(response.json()["results"][1]["symbol"], "$")
+        results = response.json()["results"]
+        usd_rows = [r for r in results if r["id"] == main_currency.id]
+        self.assertEqual(len(usd_rows), 1)
+        usd_row = usd_rows[0]
+        self.assertEqual(usd_row["name"], "USD")
+        self.assertEqual(usd_row["symbol"], "$")
         self.assertEqual(
-            response.json()["results"][1]["balance"],
+            usd_row["balance"],
             "{:.2f}".format(SUM_OF_MAIN_CURRENCY_TRANSACTIONS),
         )
 

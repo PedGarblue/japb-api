@@ -1,7 +1,21 @@
+import logging
+
 from japb_api.celery import app
-from japb_api.currencies.models import Currency, CurrencyConversionHistorial
+from japb_api.currencies.conversion_sources.binance import (
+    binance_symbol_for_currency,
+    fetch_usdt_per_unit,
+)
 import japb_api.currencies.conversion_sources.ves_to_eur as ves_to_eur
 import japb_api.currencies.conversion_sources.ves_to_usd as ves_to_usd
+from japb_api.currencies.models import (
+    AssetKind,
+    Currency,
+    CurrencyConversionHistorial,
+)
+
+logger = logging.getLogger(__name__)
+
+BINANCE_SPOT = "binance_spot"
 
 
 @app.task
@@ -43,3 +57,36 @@ def update_currency_historial():
         print("VES to EUR from BCV: €{rate_bcv_eur}")
     else:
         print("No rate found for VES to EUR from BCV source")
+
+
+@app.task
+def update_crypto_spot_conversions():
+    """
+    Fetch public Binance spot USDT prices and append historial rows.
+    Schedule: hourly (see celery beat). Uses UTC.
+    """
+    try:
+        usd = Currency.objects.get(name="USD")
+    except Currency.DoesNotExist:
+        logger.error("USD currency missing; skipping crypto spot conversion update")
+        return
+
+    for currency in Currency.objects.filter(
+        asset_kind=AssetKind.CRYPTO,
+        default_conversion_source=BINANCE_SPOT,
+        user__isnull=True,
+    ).order_by("name"):
+        pair = binance_symbol_for_currency(currency.name)
+        if not pair:
+            logger.debug("No Binance USDT pair mapped for currency %s", currency.name)
+            continue
+        usdt_per_unit = fetch_usdt_per_unit(pair)
+        if usdt_per_unit is None:
+            continue
+        rate = 1.0 / usdt_per_unit
+        CurrencyConversionHistorial.objects.create(
+            currency_from=currency,
+            currency_to=usd,
+            source=BINANCE_SPOT,
+            rate=rate,
+        )

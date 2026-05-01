@@ -691,14 +691,16 @@ class TestExpensesSummaryViewSet(APITestCase):
         now = django_timezone.now()
         # Calculate start of current month
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        
+        # Must satisfy month_start <= date <= now (avoid dates after "now" early in the month)
+        in_month = max(month_start, min(month_start + timedelta(days=5), now))
+
         # Create transaction within current month
         Transaction.objects.create(
             user=self.user,
             account=self.usd_account,
             amount=-5000,  # -50.00 USD
             description="Current Month Expense",
-            date=month_start + timedelta(days=5),
+            date=in_month,
             category=self.parent_category,
         )
         # Create transaction before current month (should be excluded)

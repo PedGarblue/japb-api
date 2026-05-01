@@ -112,6 +112,16 @@ class TestRenewProductLists(TestCase):
         self.assertEqual(duplicate_item.quantity, self.list_item.quantity)
         self.assertEqual(duplicate_item.quantity_purchased, 0)  # Should be reset
 
+    def test_renew_product_lists_idempotent(self):
+        """Expired lists must not spawn a new row on every beat run (memory / DB explosion)."""
+        initial_count = ProductList.objects.count()
+        renew_product_lists()
+        after_first = ProductList.objects.count()
+        renew_product_lists()
+        after_second = ProductList.objects.count()
+        self.assertEqual(after_first - initial_count, 2)
+        self.assertEqual(after_second, after_first)
+
     # Test with specific dates to verify month-end handling
     @freeze_time("2024-01-31")  # January 31st
     def test_month_end_handling(self):

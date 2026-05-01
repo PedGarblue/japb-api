@@ -68,6 +68,11 @@ class Common(Configuration):
     CELERY_ACCEPT_CONTENT = ['json']
     CELERY_TASK_SERIALIZER = 'json'
 
+    # Public Binance REST (spot ticker); override in tests via env
+    BINANCE_API_BASE_URL = os.getenv(
+        'BINANCE_API_BASE_URL', 'https://api.binance.com'
+    )
+
     # Postgres
     DATABASES = {
         'default': dj_database_url.config(

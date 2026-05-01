@@ -17,7 +17,7 @@ def convert_transaction_to_usd(transaction, usd_currency):
     conversion = (
         CurrencyConversionHistorial.objects.filter(
             currency_from=transaction.account.currency,
-            currency_to=usd_currency,
+            currency_to__name="USD",
             source=transaction.account.currency.default_conversion_source,
             date__lte=transaction.date,
         )

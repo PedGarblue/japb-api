@@ -12,6 +12,7 @@ class AccountSerializer(serializers.ModelSerializer):
     balance = serializers.SerializerMethodField()
     balance_as_main_currency = serializers.SerializerMethodField()
     latest_conversion_rate_to_main = serializers.SerializerMethodField()
+    decimal_places = serializers.IntegerField(required=False, min_value=0, max_value=28)
 
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
 
@@ -29,10 +30,27 @@ class AccountSerializer(serializers.ModelSerializer):
         ]
         read_only_field = (["id", "created_at", "balance", "balance_as_main_currency"],)
 
+    def create(self, validated_data):
+        if "decimal_places" not in self.initial_data:
+            validated_data["decimal_places"] = validated_data[
+                "currency"
+            ].default_decimal_places
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        currency = validated_data.get("currency", instance.currency)
+        if "decimal_places" not in self.initial_data:
+            if (
+                "currency" in validated_data
+                and validated_data["currency"] != instance.currency
+            ):
+                validated_data["decimal_places"] = currency.default_decimal_places
+        return super().update(instance, validated_data)
+
     def get_latest_conversion_rate_to_main(self, account):
         queryset = CurrencyConversionHistorial.objects.filter(
             currency_from=account.currency.id,
-            currency_to=Currency.objects.get(name="USD"),
+            currency_to__name="USD",
             source=account.currency.default_conversion_source,
         )
         conversion = queryset.order_by("-date").first()

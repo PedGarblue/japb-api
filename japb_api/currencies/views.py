@@ -11,7 +11,8 @@ class CurrencyViewSet(viewsets.ModelViewSet):
     serializer_class = CurrencySerializer
     permission_classes = (IsAdminOrReadOnly,)
     filter_backends = (DjangoFilterBackend, filters.OrderingFilter)
-    ordering_fields = ["name", "created_at", "updated_at"]
+    filterset_fields = ["asset_kind"]
+    ordering_fields = ["name", "asset_kind", "created_at", "updated_at"]
     ordering = ["name"]
 
 

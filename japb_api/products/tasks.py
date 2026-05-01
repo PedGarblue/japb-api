@@ -1,6 +1,8 @@
 from datetime import datetime
+
 from dateutil.relativedelta import relativedelta
 from django.db.models import Sum
+from django.utils import timezone
 from celery import shared_task
 
 from japb_api.celery import app
@@ -8,14 +10,37 @@ from japb_api.products.models import ProductList, ProductListItem
 from japb_api.users.models import User
 from japb_api.transactions.models import Transaction, TransactionItem
 
+
+def _has_monthly_successor(product_list):
+    """True if the next period row already exists (same user, name, period_start=old.period_end)."""
+    qs = ProductList.objects.filter(
+        name=product_list.name,
+        period_start=product_list.period_end,
+        period_type="MONTHLY",
+    )
+    uid = product_list.user_id
+    if uid is None:
+        qs = qs.filter(user__isnull=True)
+    else:
+        qs = qs.filter(user_id=uid)
+    return qs.exists()
+
+
 @app.task
 # when a product list period ends, we need to renew it
 # duplicate the product list and create a new one with the next period
 def renew_product_lists():
+    # Compare dates to DateField; use timezone-aware "today" like the rest of the app.
+    today = timezone.now().date()
     product_lists = ProductList.objects.filter(
-        period_end__lte=datetime.now(), period_type="MONTHLY"
-    )
+        period_end__lte=today, period_type="MONTHLY"
+    ).iterator(chunk_size=256)
+
     for product_list in product_lists:
+        # Without this check, expired lists never leave the queryset and each scheduler run
+        # creates another duplicate with the same period_start, exploding row count and RAM.
+        if _has_monthly_successor(product_list):
+            continue
         # Calculate the next period end date by adding 1 month
         # This will properly handle month boundaries (31 days, February 28/29 days)
         next_period_start = product_list.period_end

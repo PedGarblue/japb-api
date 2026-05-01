@@ -15,6 +15,12 @@ from japb_api.currencies.models import Currency, CurrencyConversionHistorial
 from japb_api.users.models import User
 
 
+def _transaction_date_safe_for_current_month(now):
+    """Avoid dates before month start when ``now`` is on the 1st (e.g. yesterday was last month)."""
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    return max(month_start, now - timedelta(days=1))
+
+
 class TestCashflowSummaryViewSet(APITestCase):
     def setUp(self):
         self.fake = Faker(["en-US"])
@@ -95,12 +101,13 @@ class TestCashflowSummaryViewSet(APITestCase):
 
     def test_fcf_income_minus_expenses(self):
         now = django_timezone.now()
+        tx_date = _transaction_date_safe_for_current_month(now)
         Transaction.objects.create(
             user=self.user,
             account=self.usd_account,
             amount=10_000,
             description="Income",
-            date=now - timedelta(days=1),
+            date=tx_date,
             category=self.income_category,
         )
         Transaction.objects.create(
@@ -108,7 +115,7 @@ class TestCashflowSummaryViewSet(APITestCase):
             account=self.usd_account,
             amount=-3_000,
             description="Expense",
-            date=now - timedelta(days=1),
+            date=tx_date,
             category=self.expense_category,
         )
 
@@ -122,12 +129,13 @@ class TestCashflowSummaryViewSet(APITestCase):
 
     def test_excludes_currency_exchanges(self):
         now = django_timezone.now()
+        tx_date = _transaction_date_safe_for_current_month(now)
         CurrencyExchange.objects.create(
             user=self.user,
             account=self.usd_account,
             amount=-5_000,
             description="Exchange",
-            date=now - timedelta(days=1),
+            date=tx_date,
             type="from_same_currency",
             category=self.expense_category,
         )
@@ -136,7 +144,7 @@ class TestCashflowSummaryViewSet(APITestCase):
             account=self.usd_account,
             amount=-2_000,
             description="Expense",
-            date=now - timedelta(days=1),
+            date=tx_date,
             category=self.expense_category,
         )
 
@@ -149,12 +157,13 @@ class TestCashflowSummaryViewSet(APITestCase):
 
     def test_excludes_exchange_profit(self):
         now = django_timezone.now()
+        tx_date = _transaction_date_safe_for_current_month(now)
         exchange_from = CurrencyExchange.objects.create(
             user=self.user,
             account=self.usd_account,
             amount=-10_000,
             description="From",
-            date=now - timedelta(days=1),
+            date=tx_date,
             type="from_same_currency",
             category=None,
         )
@@ -163,7 +172,7 @@ class TestCashflowSummaryViewSet(APITestCase):
             account=self.usd_account,
             amount=9_500,
             description="To",
-            date=now - timedelta(days=1),
+            date=tx_date,
             type="to_same_currency",
             category=None,
         )
@@ -172,7 +181,7 @@ class TestCashflowSummaryViewSet(APITestCase):
             account=self.usd_account,
             amount=500,
             description="Profit",
-            date=now - timedelta(days=1),
+            date=tx_date,
             type="profit",
             exchange_from=exchange_from,
             exchange_to=exchange_to,
@@ -183,7 +192,7 @@ class TestCashflowSummaryViewSet(APITestCase):
             account=self.usd_account,
             amount=8_000,
             description="Salary",
-            date=now - timedelta(days=1),
+            date=tx_date,
             category=self.income_category,
         )
 
@@ -275,12 +284,13 @@ class TestCashflowSummaryViewSet(APITestCase):
             user=self.user,
         )
         now = django_timezone.now()
+        tx_date = _transaction_date_safe_for_current_month(now)
         Transaction.objects.create(
             user=self.user,
             account=unknown_account,
             amount=-5_000,
             description="No rate",
-            date=now - timedelta(days=1),
+            date=tx_date,
             category=self.expense_category,
         )
 

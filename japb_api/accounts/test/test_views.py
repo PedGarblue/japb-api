@@ -6,7 +6,7 @@ from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from japb_api.users.factories import UserFactory
-from japb_api.currencies.models import Currency
+from japb_api.currencies.models import AssetKind, Currency
 from japb_api.transactions.factories import TransactionFactory
 from ..models import Account
 
@@ -51,6 +51,22 @@ class TestAccountsViews(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Account.objects.count(), 1)
         self.assertEqual(Account.objects.get().decimal_places, 2)
+
+    def test_api_create_account_without_optional_params_crypto(self):
+        Account.objects.all().delete()
+        crypto = Currency.objects.create(
+            name="TESTBTC",
+            symbol="₿",
+            asset_kind=AssetKind.CRYPTO,
+            default_decimal_places=8,
+        )
+        response = self.client.post(
+            reverse("accounts-list"),
+            {"name": "Crypto wallet", "currency": crypto.id},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Account.objects.get().decimal_places, 8)
 
     def test_api_get_accounts(self):
         nonuser = UserFactory()

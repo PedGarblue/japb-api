@@ -5,6 +5,8 @@
 
 Just Another Personal Budgeet API. Check out the project's [documentation](http://PedGarblue.github.io/japb-api/).
 
+- [Crypto conversion — frontend API](api/currencies-crypto-conversions.md)
+
 # Prerequisites
 
 - [Docker](https://docs.docker.com/docker-for-mac/install/)
