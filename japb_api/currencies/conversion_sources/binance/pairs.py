@@ -9,6 +9,7 @@ CURRENCY_NAME_TO_BINANCE_SYMBOL = {
     "SOL": "SOLUSDT",
     "BNB": "BNBUSDT",
     "ADA": "ADAUSDT",
+    "XRP": "XRPUSDT",
 }
 
 

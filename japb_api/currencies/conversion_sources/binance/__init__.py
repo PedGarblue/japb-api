@@ -2,7 +2,8 @@
 Binance integration for currency conversion.
 
 **Spot rates (this package, `spot.py`):** public REST endpoints such as
-`/api/v3/ticker/price` — no API key. Used by the hourly Celery task to fill
+`/api/v3/ticker/price` — no API key (defaults to **Binance.US**; override via
+`BINANCE_API_BASE_URL` for global Binance). Used by the hourly Celery task to fill
 `CurrencyConversionHistorial` with source `binance_spot`.
 
 **Future P2P / user keys:** authenticated Binance APIs (e.g. P2P order history)

@@ -6,7 +6,7 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_BASE_URL = "https://api.binance.com"
+DEFAULT_BASE_URL = "https://api.binance.us"
 
 
 def _base_url() -> str:
@@ -17,7 +17,8 @@ def fetch_usdt_per_unit(trading_pair: str, *, timeout: float = 10.0) -> Optional
     """
     Last traded price for `trading_pair` (e.g. BTCUSDT) in USDT per 1 base asset.
 
-    Uses the public REST API; no API key. Returns None on failure.
+    Uses the public REST API (Binance.US by default via settings); no API key.
+    Returns None on failure.
     """
     base = _base_url().rstrip("/")
     url = f"{base}/api/v3/ticker/price"

@@ -12,10 +12,10 @@ class Report(models.Model):
     from_date = models.DateField()
     to_date = models.DateField()
     # balances are stored as integers just like transactions
-    initial_balance = models.IntegerField(default=0)
-    end_balance = models.IntegerField(default=0)
-    total_income = models.IntegerField(default=0)
-    total_expenses = models.IntegerField(default=0)
+    initial_balance = models.BigIntegerField(default=0)
+    end_balance = models.BigIntegerField(default=0)
+    total_income = models.BigIntegerField(default=0)
+    total_expenses = models.BigIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

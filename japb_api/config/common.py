@@ -68,9 +68,10 @@ class Common(Configuration):
     CELERY_ACCEPT_CONTENT = ['json']
     CELERY_TASK_SERIALIZER = 'json'
 
-    # Public Binance REST (spot ticker); override in tests via env
+    # Public Binance REST spot ticker (no API key). Default Binance.US so US-hosted
+    # workers avoid HTTP 451 from api.binance.com. Non-US: set BINANCE_API_BASE_URL=https://api.binance.com
     BINANCE_API_BASE_URL = os.getenv(
-        'BINANCE_API_BASE_URL', 'https://api.binance.com'
+        'BINANCE_API_BASE_URL', 'https://api.binance.us'
     )
 
     # Postgres

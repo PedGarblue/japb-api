@@ -49,6 +49,17 @@ class TestTransactionModel(TestCase):
         )
         self.assertEqual(transaction.category, self.category)
 
+    def test_transaction_amount_exceeds_int32(self) -> None:
+        """Crypto with 8 dp: minor units can exceed 2^31-1 (e.g. 72 * 10^8)."""
+        large = 7_200_000_000
+        transaction = TransactionFactory(
+            account=self.account,
+            amount=large,
+            category=self.category,
+        )
+        transaction.refresh_from_db()
+        self.assertEqual(transaction.amount, large)
+
 
 class TestCurrencyExchangeModel(TestCase):
     def setUp(self):

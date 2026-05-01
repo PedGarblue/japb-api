@@ -7,10 +7,10 @@ class Transaction(models.Model):
     user = models.ForeignKey("users.User", null=True, on_delete=models.CASCADE)
     account = models.ForeignKey(Account, on_delete=models.PROTECT)
     category = models.ForeignKey("Category", null=True, on_delete=models.SET_NULL)
-    amount = models.IntegerField()
+    amount = models.BigIntegerField()
     description = models.CharField(max_length=500)
     date = models.DateTimeField()
-    to_main_currency_amount = models.IntegerField(null=True)
+    to_main_currency_amount = models.BigIntegerField(null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -20,10 +20,10 @@ class Transaction(models.Model):
 class TransactionItem(models.Model):
     transaction = models.ForeignKey("Transaction", on_delete=models.CASCADE)
     product = models.ForeignKey("products.Product", on_delete=models.CASCADE)
-    quantity = models.IntegerField(default=0, validators=[MinValueValidator(0)])
+    quantity = models.BigIntegerField(default=0, validators=[MinValueValidator(0)])
     # not used for now, the frontend will only ask for the quantity
-    price = models.IntegerField(null=True)
-    total_price = models.IntegerField(null=True)
+    price = models.BigIntegerField(null=True)
+    total_price = models.BigIntegerField(null=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
