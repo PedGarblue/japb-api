@@ -63,6 +63,9 @@ class Common(Configuration):
         ('Author', 'budarepierre@gmail.com'),
     )
 
+    # Periodic product-list renewal (celery task). Opt out with ENABLE_RENEW_PRODUCT_LISTS=false.
+    ENABLE_RENEW_PRODUCT_LISTS = bool(strtobool(os.getenv('ENABLE_RENEW_PRODUCT_LISTS', 'true')))
+
     # Celery Configuration
     CELERY_BROKER_URL = 'redis://redis:6379/0'  # Use Redis as the message broker
     CELERY_ACCEPT_CONTENT = ['json']

@@ -1,4 +1,4 @@
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from datetime import timedelta, datetime
 from django.utils import timezone
 from dateutil.relativedelta import relativedelta
@@ -11,6 +11,7 @@ from japb_api.transactions.models import Transaction, TransactionItem
 from japb_api.transactions.factories import TransactionFactory
 
 
+@override_settings(ENABLE_RENEW_PRODUCT_LISTS=True)
 class TestRenewProductLists(TestCase):
     def setUp(self):
         # Create product lists with different conditions

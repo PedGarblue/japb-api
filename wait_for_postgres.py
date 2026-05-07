@@ -1,4 +1,5 @@
 import os
+import sys
 import logging
 from time import time, sleep
 import psycopg2
@@ -33,4 +34,5 @@ def pg_isready(host, user, password, dbname):
     return False
 
 
-pg_isready(**config)
+if not pg_isready(**config):
+    sys.exit(1)

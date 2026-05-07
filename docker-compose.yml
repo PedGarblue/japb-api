@@ -1,6 +1,12 @@
 services:
   postgres:
     image: postgres:11.6
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 2s
+      timeout: 5s
+      retries: 15
+      start_period: 5s
 
   redis:
     image: redis:7.0
@@ -22,14 +28,19 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
+  # Prefork pool defaults to one process per CPU; each fork loads Django + deps
+  # and can look like a "leak" as RSS grows until stable. Solo uses one process
+  # (fine for local dev). Use: docker stats  — to see which container uses RAM.
   celery:
     build: ./
     command: >
       bash -c "./wait-for-web.sh http://web:8000 &&
-               celery -A japb_api worker --loglevel=info"
+               celery -A japb_api worker --loglevel=info --pool=solo --concurrency=1"
     env_file: web.env
     volumes:
       - ./:/code

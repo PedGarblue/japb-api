@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from dateutil.relativedelta import relativedelta
+from django.conf import settings
 from django.db.models import Sum
 from django.utils import timezone
 from celery import shared_task
@@ -30,6 +31,8 @@ def _has_monthly_successor(product_list):
 # when a product list period ends, we need to renew it
 # duplicate the product list and create a new one with the next period
 def renew_product_lists():
+    if not getattr(settings, 'ENABLE_RENEW_PRODUCT_LISTS', True):
+        return
     # Compare dates to DateField; use timezone-aware "today" like the rest of the app.
     today = timezone.now().date()
     product_lists = ProductList.objects.filter(

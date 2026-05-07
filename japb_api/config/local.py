@@ -1,10 +1,14 @@
 import os
+from distutils.util import strtobool
 from .common import Common
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 class Local(Common):
     DEBUG = True
+
+    # Local / docker-compose: off unless explicitly enabled (stale celerybeat-schedule may still enqueue).
+    ENABLE_RENEW_PRODUCT_LISTS = bool(strtobool(os.getenv('ENABLE_RENEW_PRODUCT_LISTS', 'false')))
 
     # Testing
     INSTALLED_APPS = Common.INSTALLED_APPS
