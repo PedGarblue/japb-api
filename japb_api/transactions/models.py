@@ -6,6 +6,13 @@ from ..accounts.models import Account
 class Transaction(models.Model):
     user = models.ForeignKey("users.User", null=True, on_delete=models.CASCADE)
     account = models.ForeignKey(Account, on_delete=models.PROTECT)
+    receivable = models.ForeignKey(
+        "receivables.Receivable",
+        related_name="transactions",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
     category = models.ForeignKey("Category", null=True, on_delete=models.SET_NULL)
     amount = models.BigIntegerField()
     description = models.CharField(max_length=500)

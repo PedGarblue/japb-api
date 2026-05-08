@@ -2,6 +2,12 @@
 
 How to read Binance-backed spot rates and USD equivalents for cryptocurrencies. Rates are populated by the hourly Celery task (`update_crypto_spot_conversions`) into `CurrencyConversionHistorial` with source `binance_spot`.
 
+## Spot price source (Binance.US vs global)
+
+The Celery task calls the **public** ticker endpoint (`/api/v3/ticker/price`). By default Django uses **`https://api.binance.us`** (`BINANCE_API_BASE_URL` in [`japb_api/config/common.py`](../../japb_api/config/common.py)) so **US-hosted** servers avoid HTTP **451** from global `api.binance.com`. Deployments outside the US can set:
+
+`BINANCE_API_BASE_URL=https://api.binance.com`
+
 ## Base URL and authentication
 
 - API prefix: **`/api/v1/`** (see [`japb_api/urls.py`](../../japb_api/urls.py)).
@@ -33,7 +39,7 @@ Returns paginated currencies. Serializer: [`CurrencySerializer`](../../japb_api/
 | Field                             | Type           | Description |
 |-----------------------------------|----------------|-------------|
 | `id`                              | integer        | Currency primary key. |
-| `name`                            | string         | e.g. `BTC`, `ETH`. |
+| `name`                            | string         | e.g. `BTC`, `ETH`, `XRP`. |
 | `symbol`                          | string \| null | Display symbol. |
 | `asset_kind`                      | string         | `"fiat"` or `"crypto"`. |
 | `default_decimal_places`        | integer        | Hint for formatting amounts. |

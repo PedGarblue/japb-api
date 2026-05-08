@@ -2,6 +2,7 @@ import django_filters
 from rest_framework import serializers
 from .models import Transaction, CurrencyExchange, ExchangeComission, Category, TransactionItem
 from japb_api.accounts.models import Account
+from japb_api.receivables.models import Receivable
 
 
 class TransactionItemSerializer(serializers.ModelSerializer):
@@ -14,6 +15,14 @@ class TransactionItemSerializer(serializers.ModelSerializer):
 class TransactionSerializer(serializers.ModelSerializer):
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
     transaction_items = TransactionItemSerializer(source='transactionitem_set', many=True, required=False)
+    receivable = serializers.PrimaryKeyRelatedField(
+        queryset=Receivable.objects.all(),
+        allow_null=True,
+        required=False,
+    )
+    is_loan = serializers.BooleanField(required=False, default=False, write_only=True)
+    contact = serializers.CharField(required=False, allow_blank=True, write_only=True, max_length=500)
+    loan_due_date = serializers.DateField(required=False, allow_null=True, write_only=True)
 
     class Meta:
         model = Transaction
@@ -27,10 +36,25 @@ class TransactionSerializer(serializers.ModelSerializer):
             "category",
             "date",
             "transaction_items",
+            "receivable",
+            "is_loan",
+            "contact",
+            "loan_due_date",
         ]
         read_only_fields = ["id"]
 
+    def validate_receivable(self, value):
+        if value is None:
+            return value
+        request = self.context.get("request")
+        if request and value.user_id != request.user.id:
+            raise serializers.ValidationError("Invalid receivable.")
+        return value
+
     def create(self, validated_data):
+        validated_data.pop("is_loan", None)
+        validated_data.pop("contact", None)
+        validated_data.pop("loan_due_date", None)
         transaction_items_data = None
         if 'transactionitem_set' in validated_data:
             transaction_items_data = validated_data.pop('transactionitem_set')
@@ -52,9 +76,13 @@ class TransactionSerializer(serializers.ModelSerializer):
                 10**instance.account.decimal_places
             )
             rep["to_main_currency_amount"] = f"{to_main_currency_amount:.2f}"
+        rep["receivable"] = instance.receivable_id
         return rep
 
     def update(self, instance, validated_data):
+        validated_data.pop("is_loan", None)
+        validated_data.pop("contact", None)
+        validated_data.pop("loan_due_date", None)
         transaction_items_data = None
         if 'transactionitem_set' in validated_data:
             transaction_items_data = validated_data.pop('transactionitem_set')

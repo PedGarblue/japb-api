@@ -1,7 +1,9 @@
 import calendar
 from datetime import timedelta, datetime, date, time
+from dateutil.relativedelta import relativedelta
 from django.db.models import Q
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime, parse_date
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets, filters
 from rest_framework import serializers
@@ -11,6 +13,7 @@ from rest_framework.permissions import IsAuthenticated
 from .tasks import update_reports
 from ..accounts.models import Account
 from japb_api.currencies.models import CurrencyConversionHistorial, Currency
+from japb_api.receivables.models import Receivable
 from .permissions import IsOwnerOrReadOnly, IsOwner
 from .models import Transaction, CurrencyExchange, ExchangeComission, Category
 from .serializers import (
@@ -25,6 +28,105 @@ from .utils import convert_transaction_to_usd, should_skip_transaction
 
 def parse_amount(amount, decimal_places):
     return int(amount * (10**decimal_places))
+
+
+def _coerce_to_date(value):
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        dt = parse_datetime(value)
+        if dt:
+            return dt.date()
+        d = parse_date(value)
+        if d:
+            return d
+    return None
+
+
+def apply_loan_receivable(request, tx_data, parsed_amount, existing_transaction=None):
+    """
+    Resolve receivable FK and optionally create a Receivable for loans. Mutates tx_data.
+    Returns a Response error or None.
+    """
+    if tx_data.get("receivable") not in (None, ""):
+        try:
+            rec = Receivable.objects.get(pk=tx_data["receivable"])
+        except (Receivable.DoesNotExist, TypeError, ValueError):
+            return Response(
+                {"receivable": ["Invalid receivable."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if rec.user_id != request.user.id:
+            return Response(
+                {"receivable": ["Invalid receivable."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        tx_data["receivable"] = rec.pk
+        return None
+
+    is_loan = tx_data.get("is_loan", False)
+    if not is_loan:
+        return None
+
+    if parsed_amount >= 0:
+        return Response(
+            {"is_loan": ["Loan transactions must have a negative amount."]},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if existing_transaction and existing_transaction.receivable_id:
+        return None
+
+    contact = (tx_data.get("contact") or "").strip()
+    if not contact:
+        return Response(
+            {"contact": ["This field is required when is_loan is true."]},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    raw_date = tx_data.get("date")
+    if raw_date is None and existing_transaction is not None:
+        base_date = existing_transaction.date.date()
+    else:
+        base_date = _coerce_to_date(raw_date)
+    if base_date is None:
+        return Response(
+            {"date": ["A valid date is required when creating a loan receivable."]},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    loan_due_date = tx_data.get("loan_due_date")
+    if loan_due_date:
+        if isinstance(loan_due_date, datetime):
+            due = loan_due_date.date()
+        elif isinstance(loan_due_date, date) and not isinstance(loan_due_date, datetime):
+            due = loan_due_date
+        else:
+            due = _coerce_to_date(loan_due_date)
+            if due is None:
+                return Response(
+                    {"loan_due_date": ["Invalid date."]},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+    else:
+        due = base_date + relativedelta(months=1)
+
+    description = (tx_data.get("description") or "").strip()
+    if not description and existing_transaction is not None:
+        description = existing_transaction.description or ""
+
+    rec = Receivable.objects.create(
+        user=request.user,
+        description=description,
+        contact=contact,
+        due_date=due,
+    )
+    tx_data["receivable"] = rec.pk
+    return None
 
 
 class TransactionViewSet(viewsets.ModelViewSet):
@@ -49,35 +151,41 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
         created_transactions = []
         for transaction_data in transactions_data:
-            transaction_serializer = self.get_serializer(data=transaction_data)
-            account = Account.objects.get(
-                pk=transaction_serializer.initial_data.get("account")
+            tx_data = (
+                transaction_data.copy()
+                if isinstance(transaction_data, dict)
+                else dict(transaction_data)
             )
 
-            amount = float(transaction_serializer.initial_data.get("amount"))
+            account = Account.objects.get(pk=tx_data.get("account"))
+
+            amount = float(tx_data.get("amount"))
             decimal_places = account.decimal_places
 
-            transaction_serializer.initial_data["amount"] = parse_amount(
-                amount, decimal_places
-            )
+            parsed_amount = parse_amount(amount, decimal_places)
+            tx_data["amount"] = parsed_amount
 
-            # Get conversion for the transaction date
             conversion = (
                 CurrencyConversionHistorial.objects.filter(
                     currency_from=account.currency,
                     currency_to__name="USD",
                     source=account.currency.default_conversion_source,
-                    date__lte=transaction_serializer.initial_data.get("date"),
+                    date__lte=tx_data.get("date"),
                 )
                 .order_by("-date")
                 .first()
             )
 
             if conversion:
-                transaction_serializer.initial_data["to_main_currency_amount"] = int(
+                tx_data["to_main_currency_amount"] = int(
                     parse_amount(amount, 2) / conversion.rate
                 )
 
+            err = apply_loan_receivable(request, tx_data, parsed_amount)
+            if err is not None:
+                return err
+
+            transaction_serializer = self.get_serializer(data=tx_data)
             if transaction_serializer.is_valid():
                 transaction = transaction_serializer.save()
                 created_transactions.append(transaction_serializer.data)
@@ -100,35 +208,52 @@ class TransactionViewSet(viewsets.ModelViewSet):
         except Transaction.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
-        serializer = self.get_serializer(transaction, data=request.data, partial=True)
-
-        amount = float(serializer.initial_data.get("amount"))
-        decimal_places = Account.objects.get(
-            pk=serializer.initial_data.get("account")
-        ).decimal_places
-        serializer.initial_data["amount"] = parse_amount(amount, decimal_places)
-        account = Account.objects.get(pk=serializer.initial_data.get("account"))
-
-        if account.currency.name == "USD":
-            serializer.initial_data["to_main_currency_amount"] = None
-
-        # Get conversion for the transaction date
-        conversion = (
-            CurrencyConversionHistorial.objects.filter(
-                currency_from=account.currency,
-                currency_to__name="USD",
-                source=account.currency.default_conversion_source,
-                date__lte=serializer.initial_data.get("date"),
-            )
-            .order_by("-date")
-            .first()
+        tx_data = (
+            request.data.copy() if hasattr(request.data, "copy") else dict(request.data)
         )
 
-        if conversion:
-            serializer.initial_data["to_main_currency_amount"] = int(
-                parse_amount(amount, 2) / conversion.rate
+        account_id = tx_data.get("account", transaction.account_id)
+        account = Account.objects.get(pk=account_id)
+
+        if "amount" in tx_data:
+            amount = float(tx_data["amount"])
+        else:
+            amount = transaction.amount / (10 ** transaction.account.decimal_places)
+
+        decimal_places = account.decimal_places
+        parsed_amount = parse_amount(amount, decimal_places)
+        tx_data["amount"] = parsed_amount
+
+        tx_data.setdefault("account", transaction.account_id)
+        tx_data.setdefault("description", transaction.description)
+        tx_data.setdefault("date", transaction.date)
+
+        if account.currency.name == "USD":
+            tx_data["to_main_currency_amount"] = None
+        else:
+            conversion = (
+                CurrencyConversionHistorial.objects.filter(
+                    currency_from=account.currency,
+                    currency_to__name="USD",
+                    source=account.currency.default_conversion_source,
+                    date__lte=tx_data.get("date"),
+                )
+                .order_by("-date")
+                .first()
             )
 
+            if conversion:
+                tx_data["to_main_currency_amount"] = int(
+                    parse_amount(amount, 2) / conversion.rate
+                )
+
+        err = apply_loan_receivable(
+            request, tx_data, parsed_amount, existing_transaction=transaction
+        )
+        if err is not None:
+            return err
+
+        serializer = self.get_serializer(transaction, data=tx_data, partial=True)
         if serializer.is_valid():
             serializer.save()
             update_reports.delay(transaction.account.id)

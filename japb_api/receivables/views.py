@@ -18,4 +18,8 @@ class ReceivableViewSet(viewsets.ModelViewSet):
     ordering = ["created_at"]
 
     def get_queryset(self):
-        return Receivable.objects.filter(user=self.request.user)
+        return (
+            Receivable.objects.filter(user=self.request.user)
+            .prefetch_related("transactions__account__currency")
+            .select_related("user")
+        )
