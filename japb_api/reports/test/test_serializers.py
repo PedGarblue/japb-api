@@ -130,3 +130,20 @@ class CurrencyReportSerializerTestCase(TestCase):
         self.report.end_balance = 200000
         data = self.serializer.data
         self.assertEqual(data["balance_status"], "neutral")
+
+    def test_formats_amount_fields_without_account(self):
+        self.account.delete()
+        data = ReportCurrencySerializer(instance=self.report).data
+        self.assertEqual(data["initial_balance"], "2000.00")
+        self.assertEqual(data["end_balance"], "2500.00")
+        self.assertEqual(data["total_income"], "750.00")
+        self.assertEqual(data["total_expenses"], "250.00")
+
+    def test_formats_amount_fields_without_account_uses_currency_default(self):
+        self.account.delete()
+        self.currency.default_decimal_places = 8
+        self.currency.save()
+        self.report.initial_balance = 2000 * (10**8)
+        self.report.save()
+        data = ReportCurrencySerializer(instance=self.report).data
+        self.assertEqual(data["initial_balance"], "2000.00000000")

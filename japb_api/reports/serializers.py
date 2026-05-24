@@ -106,11 +106,15 @@ class ReportCurrencySerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
-        greater_decimal_places = (
-            Account.objects.filter(currency=instance.currency)
+        account = (
+            Account.objects.filter(currency=instance.currency, user=instance.user)
             .order_by("-decimal_places")
             .first()
-            .decimal_places
+        )
+        greater_decimal_places = (
+            account.decimal_places
+            if account
+            else instance.currency.default_decimal_places
         )
 
         initial_balance = rep.get("initial_balance") / (10**greater_decimal_places)
