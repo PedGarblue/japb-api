@@ -47,7 +47,7 @@ class TransactionSerializer(serializers.ModelSerializer):
         if value is None:
             return value
         request = self.context.get("request")
-        if request and value.user_id != request.user.id:
+        if request and str(value.user_id) != str(request.user.id):
             raise serializers.ValidationError("Invalid receivable.")
         return value
 
@@ -77,6 +77,9 @@ class TransactionSerializer(serializers.ModelSerializer):
             )
             rep["to_main_currency_amount"] = f"{to_main_currency_amount:.2f}"
         rep["receivable"] = instance.receivable_id
+        if instance.receivable_id:
+            rep["contact"] = instance.receivable.contact.name
+            rep["contact_id"] = instance.receivable.contact_id
         return rep
 
     def update(self, instance, validated_data):

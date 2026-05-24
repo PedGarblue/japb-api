@@ -2,6 +2,10 @@ from japb_api.currencies.models import CurrencyConversionHistorial
 from .models import CurrencyExchange, ExchangeComission
 
 
+def parse_amount(amount, decimal_places):
+    return int(amount * (10**decimal_places))
+
+
 def convert_transaction_to_usd(transaction, usd_currency):
     """
     Convert a transaction amount to USD.

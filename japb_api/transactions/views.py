@@ -24,10 +24,11 @@ from .serializers import (
     TransactionFilterSet,
 )
 from japb_api.products.tasks import update_user_product_list_items
-from .utils import convert_transaction_to_usd, should_skip_transaction
-
-def parse_amount(amount, decimal_places):
-    return int(amount * (10**decimal_places))
+from japb_api.receivables.utils import (
+    expand_contact_collection,
+    get_or_create_contact,
+)
+from .utils import convert_transaction_to_usd, parse_amount, should_skip_transaction
 
 
 def _coerce_to_date(value):
@@ -47,7 +48,7 @@ def _coerce_to_date(value):
     return None
 
 
-def apply_loan_receivable(request, tx_data, parsed_amount, existing_transaction=None):
+def apply_receivable_link(request, tx_data, parsed_amount, existing_transaction=None):
     """
     Resolve receivable FK and optionally create a Receivable for loans. Mutates tx_data.
     Returns a Response error or None.
@@ -60,12 +61,15 @@ def apply_loan_receivable(request, tx_data, parsed_amount, existing_transaction=
                 {"receivable": ["Invalid receivable."]},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        if rec.user_id != request.user.id:
+        if str(rec.user_id) != str(request.user.id):
             return Response(
                 {"receivable": ["Invalid receivable."]},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         tx_data["receivable"] = rec.pk
+        return None
+
+    if parsed_amount > 0 and (tx_data.get("contact") or "").strip():
         return None
 
     is_loan = tx_data.get("is_loan", False)
@@ -119,14 +123,18 @@ def apply_loan_receivable(request, tx_data, parsed_amount, existing_transaction=
     if not description and existing_transaction is not None:
         description = existing_transaction.description or ""
 
+    contact_obj = get_or_create_contact(request.user, contact)
     rec = Receivable.objects.create(
         user=request.user,
         description=description,
-        contact=contact,
+        contact=contact_obj,
         due_date=due,
     )
     tx_data["receivable"] = rec.pk
     return None
+
+
+apply_loan_receivable = apply_receivable_link
 
 
 class TransactionViewSet(viewsets.ModelViewSet):
@@ -181,21 +189,31 @@ class TransactionViewSet(viewsets.ModelViewSet):
                     parse_amount(amount, 2) / conversion.rate
                 )
 
-            err = apply_loan_receivable(request, tx_data, parsed_amount)
-            if err is not None:
-                return err
+            split_result = expand_contact_collection(
+                request, tx_data, parsed_amount, account, conversion
+            )
+            if isinstance(split_result, Response):
+                return split_result
 
-            transaction_serializer = self.get_serializer(data=tx_data)
-            if transaction_serializer.is_valid():
-                transaction = transaction_serializer.save()
-                created_transactions.append(transaction_serializer.data)
+            batch = split_result if split_result is not None else [tx_data]
 
-                update_reports.delay(transaction.account.id)
-                update_user_product_list_items.delay(transaction.user.id)
-            else:
-                return Response(
-                    transaction_serializer.errors, status=status.HTTP_400_BAD_REQUEST
-                )
+            for item in batch:
+                err = apply_receivable_link(request, item, item["amount"])
+                if err is not None:
+                    return err
+
+                transaction_serializer = self.get_serializer(data=item)
+                if transaction_serializer.is_valid():
+                    transaction = transaction_serializer.save()
+                    created_transactions.append(transaction_serializer.data)
+
+                    update_reports.delay(transaction.account.id)
+                    update_user_product_list_items.delay(transaction.user.id)
+                else:
+                    return Response(
+                        transaction_serializer.errors,
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
 
         return Response(created_transactions, status=status.HTTP_201_CREATED)
 
@@ -228,6 +246,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
         tx_data.setdefault("description", transaction.description)
         tx_data.setdefault("date", transaction.date)
 
+        conversion = None
         if account.currency.name == "USD":
             tx_data["to_main_currency_amount"] = None
         else:
@@ -247,7 +266,22 @@ class TransactionViewSet(viewsets.ModelViewSet):
                     parse_amount(amount, 2) / conversion.rate
                 )
 
-        err = apply_loan_receivable(
+        split_result = expand_contact_collection(
+            request, tx_data, parsed_amount, account, conversion
+        )
+        if isinstance(split_result, Response):
+            return split_result
+        if split_result is not None:
+            return Response(
+                {
+                    "contact": [
+                        "Contact-level collection split is only supported on create."
+                    ]
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        err = apply_receivable_link(
             request, tx_data, parsed_amount, existing_transaction=transaction
         )
         if err is not None:

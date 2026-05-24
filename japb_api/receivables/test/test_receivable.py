@@ -7,10 +7,9 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from japb_api.accounts.models import Account
 from japb_api.currencies.models import Currency, CurrencyConversionHistorial
+from japb_api.receivables.models import Contact, Receivable
 from japb_api.transactions.models import Transaction
 from japb_api.users.factories import UserFactory
-
-from ..models import Receivable
 
 
 class TestReceivableViews(APITestCase):
@@ -37,8 +36,9 @@ class TestReceivableViews(APITestCase):
         response = self.client.post(reverse("transactions-list"), payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Receivable.objects.count(), 1)
+        self.assertEqual(Contact.objects.count(), 1)
         rec = Receivable.objects.get()
-        self.assertEqual(rec.contact, "Alice")
+        self.assertEqual(rec.contact.name, "Alice")
         self.assertEqual(rec.description, "Loan to Alice")
         self.assertEqual(rec.due_date, date(2022, 6, 1))
         self.assertEqual(str(rec.user_id), str(self.user.id))
@@ -75,6 +75,68 @@ class TestReceivableViews(APITestCase):
         coll = Transaction.objects.filter(amount__gt=0).get()
         self.assertEqual(coll.receivable_id, rec.id)
 
+    def test_collection_by_contact_without_receivable_id(self):
+        self.test_loan_transaction_creates_receivable_with_explicit_due_date()
+        payload = {
+            "amount": 100.50,
+            "description": "Repayment by contact",
+            "account": self.account.id,
+            "date": datetime(2022, 3, 1, 12, 0, 0, tzinfo=timezone.utc),
+            "contact": "Alice",
+        }
+        response = self.client.post(reverse("transactions-list"), payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(len(response.json()), 1)
+        coll = Transaction.objects.filter(amount__gt=0).get()
+        self.assertEqual(coll.receivable_id, Receivable.objects.get().id)
+
+    def test_collection_by_contact_splits_across_two_receivables(self):
+        contact = Contact.objects.create(user=self.user, name="Alice")
+        rec1 = Receivable.objects.create(
+            user=self.user,
+            contact=contact,
+            description="Loan 1",
+            due_date=date(2022, 1, 1),
+        )
+        rec2 = Receivable.objects.create(
+            user=self.user,
+            contact=contact,
+            description="Loan 2",
+            due_date=date(2022, 2, 1),
+        )
+        Transaction.objects.create(
+            user=self.user,
+            account=self.account,
+            receivable=rec1,
+            amount=-10000,
+            description="Loan 1",
+            date=datetime(2022, 1, 1, tzinfo=timezone.utc),
+        )
+        Transaction.objects.create(
+            user=self.user,
+            account=self.account,
+            receivable=rec2,
+            amount=-5000,
+            description="Loan 2",
+            date=datetime(2022, 1, 2, tzinfo=timezone.utc),
+        )
+        payload = {
+            "amount": 120.0,
+            "description": "Bulk repayment",
+            "account": self.account.id,
+            "date": datetime(2022, 3, 1, 12, 0, 0, tzinfo=timezone.utc),
+            "contact": "Alice",
+        }
+        response = self.client.post(reverse("transactions-list"), payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(len(response.json()), 2)
+        collections = {
+            t.receivable_id: t
+            for t in Transaction.objects.filter(amount__gt=0)
+        }
+        self.assertEqual(collections[rec1.id].amount, 10000)
+        self.assertEqual(collections[rec2.id].amount, 2000)
+
     def test_get_receivable_detail_returns_transactions_and_usd_totals(self):
         self.test_collection_positive_transaction_links_receivable()
         rec = Receivable.objects.get()
@@ -86,9 +148,34 @@ class TestReceivableViews(APITestCase):
         self.assertEqual(body["paid_usd"], 100.50)
         self.assertEqual(body["outstanding_usd"], 0.0)
         self.assertEqual(body["status"], "PAID")
+        self.assertEqual(body["contact_name"], "Alice")
         self.assertEqual(len(body["transactions"]), 2)
-        descriptions = {t["description"] for t in body["transactions"]}
-        self.assertEqual(descriptions, {"Loan to Alice", "Repayment"})
+
+    def test_list_contacts_with_totals(self):
+        self.test_collection_by_contact_without_receivable_id()
+        response = self.client.get(reverse("contacts-list"), format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.json()["results"]
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["name"], "Alice")
+        self.assertEqual(results[0]["total_principal_usd"], 100.50)
+        self.assertEqual(results[0]["total_paid_usd"], 100.50)
+        self.assertEqual(results[0]["total_outstanding_usd"], 0.0)
+        self.assertEqual(results[0]["receivable_count"], 1)
+
+    def test_list_receivables_grouped_by_contact(self):
+        self.test_collection_by_contact_splits_across_two_receivables()
+        response = self.client.get(
+            reverse("receivables-list"), {"group_by": "contact"}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        groups = response.json()
+        self.assertEqual(len(groups), 1)
+        self.assertEqual(groups[0]["contact"], "Alice")
+        self.assertEqual(groups[0]["total_principal_usd"], 150.0)
+        self.assertEqual(groups[0]["total_paid_usd"], 120.0)
+        self.assertEqual(groups[0]["total_outstanding_usd"], 30.0)
+        self.assertEqual(len(groups[0]["receivables"]), 2)
 
     def test_is_loan_with_positive_amount_returns_400(self):
         payload = {
@@ -104,13 +191,11 @@ class TestReceivableViews(APITestCase):
         self.assertEqual(Receivable.objects.count(), 0)
 
     def test_receivable_belonging_to_other_user_returns_400(self):
-        Account.objects.create(
-            name="Other USD", user=self.other_user, currency=self.usd, decimal_places=2
-        )
+        other_contact = Contact.objects.create(user=self.other_user, name="Other")
         rec = Receivable.objects.create(
             user=self.other_user,
+            contact=other_contact,
             description="Other",
-            contact="C",
             due_date=date(2022, 1, 1),
         )
         payload = {
@@ -119,6 +204,17 @@ class TestReceivableViews(APITestCase):
             "account": self.account.id,
             "date": datetime(2022, 1, 15, 12, 0, 0, tzinfo=timezone.utc),
             "receivable": rec.id,
+        }
+        response = self.client.post(reverse("transactions-list"), payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_collection_unknown_contact_returns_400(self):
+        payload = {
+            "amount": 10.0,
+            "description": "Unknown",
+            "account": self.account.id,
+            "date": datetime(2022, 1, 15, 12, 0, 0, tzinfo=timezone.utc),
+            "contact": "Nobody",
         }
         response = self.client.post(reverse("transactions-list"), payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -136,7 +232,6 @@ class TestReceivableViews(APITestCase):
             rate=60.0,
             source="paralelo",
         )
-        # auto_now_add ignores date= on create; back-date for transaction lookup
         CurrencyConversionHistorial.objects.filter(pk=historial.pk).update(
             date=datetime(2022, 1, 10, 12, 0, 0, tzinfo=timezone.utc)
         )
@@ -155,14 +250,14 @@ class TestReceivableViews(APITestCase):
             reverse("receivables-detail", kwargs={"pk": rec.id}), format="json"
         )
         self.assertEqual(detail.status_code, status.HTTP_200_OK)
-        # -6000 VES / 60 = 100 USD principal
         self.assertEqual(detail.json()["principal_usd"], 100.0)
 
     def test_can_update_receivable_metadata(self):
+        contact = Contact.objects.create(user=self.user, name="Old contact")
         Receivable.objects.create(
             user=self.user,
+            contact=contact,
             description="Old",
-            contact="Old contact",
             due_date=date(2022, 1, 1),
         )
         rec = Receivable.objects.get()
@@ -174,13 +269,14 @@ class TestReceivableViews(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         rec.refresh_from_db()
         self.assertEqual(rec.description, "New desc")
-        self.assertEqual(rec.contact, "New contact")
+        self.assertEqual(rec.contact.name, "New contact")
 
     def test_can_delete_receivable(self):
+        contact = Contact.objects.create(user=self.user, name="C")
         Receivable.objects.create(
             user=self.user,
+            contact=contact,
             description="Del",
-            contact="C",
             due_date=date(2022, 1, 1),
         )
         rec = Receivable.objects.get()

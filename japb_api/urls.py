@@ -16,7 +16,7 @@ from .transactions.views import (
     CashflowSummaryViewSet,
     CategoryTrendViewSet,
 )
-from .receivables.views import ReceivableViewSet
+from .receivables.views import ContactViewSet, ReceivableViewSet
 from .reports.views import ReportAccountViewSet, ReportCurrencyViewSet
 from .products.views import ProductsViewSet, ProductsListViewSet, ProductListItemViewSet
 
@@ -33,6 +33,7 @@ router.register(r'exchanges', CurrencyExchangeViewSet, basename='exchanges')
 router.register(r'expenses-summary', ExpensesSummaryViewSet, basename='expenses-summary')
 router.register(r'cashflow-summary', CashflowSummaryViewSet, basename='cashflow-summary')
 router.register(r'category-trend', CategoryTrendViewSet, basename='category-trend')
+router.register(r'contacts', ContactViewSet, basename='contacts')
 router.register(r'receivables', ReceivableViewSet, basename='receivables')
 
 router.register(r'reports', ReportAccountViewSet, basename='reports')
