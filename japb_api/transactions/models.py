@@ -3,11 +3,29 @@ from django.core.validators import MinValueValidator
 from ..accounts.models import Account
 
 
+class TransactionGroup(models.Model):
+    user = models.ForeignKey("users.User", on_delete=models.CASCADE)
+    name = models.CharField(max_length=500)
+    date = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.name}"
+
+
 class Transaction(models.Model):
     user = models.ForeignKey("users.User", null=True, on_delete=models.CASCADE)
     account = models.ForeignKey(Account, on_delete=models.PROTECT)
     receivable = models.ForeignKey(
         "receivables.Receivable",
+        related_name="transactions",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    group = models.ForeignKey(
+        "TransactionGroup",
         related_name="transactions",
         null=True,
         blank=True,

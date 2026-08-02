@@ -1,6 +1,13 @@
 import django_filters
 from rest_framework import serializers
-from .models import Transaction, CurrencyExchange, ExchangeComission, Category, TransactionItem
+from .models import (
+    Transaction,
+    TransactionGroup,
+    CurrencyExchange,
+    ExchangeComission,
+    Category,
+    TransactionItem,
+)
 from japb_api.accounts.models import Account
 from japb_api.receivables.models import Receivable
 
@@ -12,6 +19,34 @@ class TransactionItemSerializer(serializers.ModelSerializer):
         read_only_fields = ['id']
 
 
+class TransactionGroupListSerializer(serializers.Serializer):
+    """Collapsed group row for the mixed transaction list feed."""
+
+    type = serializers.SerializerMethodField()
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    date = serializers.DateTimeField()
+    transaction_count = serializers.SerializerMethodField()
+    total_main_currency_amount = serializers.SerializerMethodField()
+
+    def get_type(self, obj):
+        return "group"
+
+    def get_transaction_count(self, obj):
+        if hasattr(obj, "annotated_transaction_count"):
+            return obj.annotated_transaction_count
+        return obj.transactions.count()
+
+    def get_total_main_currency_amount(self, obj):
+        members = list(obj.transactions.all())
+        if not members:
+            return None
+        if any(m.to_main_currency_amount is None for m in members):
+            return None
+        total = sum(m.to_main_currency_amount for m in members)
+        return f"{total / 100:.2f}"
+
+
 class TransactionSerializer(serializers.ModelSerializer):
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
     transaction_items = TransactionItemSerializer(source='transactionitem_set', many=True, required=False)
@@ -19,6 +54,10 @@ class TransactionSerializer(serializers.ModelSerializer):
         queryset=Receivable.objects.all(),
         allow_null=True,
         required=False,
+    )
+    group = serializers.PrimaryKeyRelatedField(read_only=True)
+    group_id = serializers.IntegerField(
+        write_only=True, required=False, allow_null=True
     )
     is_loan = serializers.BooleanField(required=False, default=False, write_only=True)
     contact = serializers.CharField(required=False, allow_blank=True, write_only=True, max_length=500)
@@ -37,11 +76,13 @@ class TransactionSerializer(serializers.ModelSerializer):
             "date",
             "transaction_items",
             "receivable",
+            "group",
+            "group_id",
             "is_loan",
             "contact",
             "loan_due_date",
         ]
-        read_only_fields = ["id"]
+        read_only_fields = ["id", "group"]
 
     def validate_receivable(self, value):
         if value is None:
@@ -51,13 +92,30 @@ class TransactionSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Invalid receivable.")
         return value
 
+    def validate_group_id(self, value):
+        if value is None:
+            return value
+        request = self.context.get("request")
+        try:
+            group = TransactionGroup.objects.get(pk=value)
+        except TransactionGroup.DoesNotExist:
+            raise serializers.ValidationError("Invalid group.")
+        if request and str(group.user_id) != str(request.user.id):
+            raise serializers.ValidationError("Invalid group.")
+        return value
+
     def create(self, validated_data):
         validated_data.pop("is_loan", None)
         validated_data.pop("contact", None)
         validated_data.pop("loan_due_date", None)
+        group_id = validated_data.pop("group_id", None)
         transaction_items_data = None
         if 'transactionitem_set' in validated_data:
             transaction_items_data = validated_data.pop('transactionitem_set')
+
+        # Prefer explicit group set by the view (new group create); else bind via group_id
+        if "group" not in validated_data and group_id is not None:
+            validated_data["group_id"] = group_id
 
         transaction = Transaction.objects.create(**validated_data)
 
@@ -69,6 +127,7 @@ class TransactionSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
+        rep["type"] = "transaction"
         amount = rep.get("amount") / (10**instance.account.decimal_places)
         rep["amount"] = f"{amount:.{instance.account.decimal_places}f}"
         if instance.to_main_currency_amount:
@@ -77,6 +136,7 @@ class TransactionSerializer(serializers.ModelSerializer):
             )
             rep["to_main_currency_amount"] = f"{to_main_currency_amount:.2f}"
         rep["receivable"] = instance.receivable_id
+        rep["group"] = instance.group_id
         if instance.receivable_id:
             rep["contact"] = instance.receivable.contact.name
             rep["contact_id"] = instance.receivable.contact_id
@@ -86,6 +146,7 @@ class TransactionSerializer(serializers.ModelSerializer):
         validated_data.pop("is_loan", None)
         validated_data.pop("contact", None)
         validated_data.pop("loan_due_date", None)
+        group_id = validated_data.pop("group_id", serializers.empty)
         transaction_items_data = None
         if 'transactionitem_set' in validated_data:
             transaction_items_data = validated_data.pop('transactionitem_set')
@@ -93,6 +154,8 @@ class TransactionSerializer(serializers.ModelSerializer):
         # Update transaction fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+        if group_id is not serializers.empty:
+            instance.group_id = group_id
         instance.save()
 
         # Handle transaction items if provided
@@ -187,6 +250,7 @@ class TransactionFilterSet(django_filters.FilterSet):
     category = django_filters.ModelChoiceFilter(
         queryset=Category.objects.all(), method="filter_category"
     )
+    group = django_filters.ModelChoiceFilter(queryset=TransactionGroup.objects.all())
     exclude_children = django_filters.BooleanFilter(method="filter_exclude_children")
     exclude_same_currency_exchanges = django_filters.BooleanFilter(
         method="filter_exclude_same_currency_exchanges"
@@ -239,6 +303,7 @@ class TransactionFilterSet(django_filters.FilterSet):
             "end_date",
             "account",
             "category",
+            "group",
             "exclude_children",
             "currency",
             "exclude_same_currency_exchanges",

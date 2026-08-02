@@ -15,9 +15,16 @@ from ..accounts.models import Account
 from japb_api.currencies.models import CurrencyConversionHistorial, Currency
 from japb_api.receivables.models import Receivable
 from .permissions import IsOwnerOrReadOnly, IsOwner
-from .models import Transaction, CurrencyExchange, ExchangeComission, Category
+from .models import (
+    Transaction,
+    TransactionGroup,
+    CurrencyExchange,
+    ExchangeComission,
+    Category,
+)
 from .serializers import (
     TransactionSerializer,
+    TransactionGroupListSerializer,
     CurrencyExchangeSerializer,
     ExchangeComissionSerializer,
     CategorySerializer,
@@ -137,6 +144,30 @@ def apply_receivable_link(request, tx_data, parsed_amount, existing_transaction=
 apply_loan_receivable = apply_receivable_link
 
 
+def _coerce_to_datetime(value):
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value if timezone.is_aware(value) else timezone.make_aware(value)
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return timezone.make_aware(datetime.combine(value, time.min))
+    if isinstance(value, str):
+        dt = parse_datetime(value)
+        if dt:
+            return dt if timezone.is_aware(dt) else timezone.make_aware(dt)
+        d = parse_date(value)
+        if d:
+            return timezone.make_aware(datetime.combine(d, time.min))
+    return None
+
+
+def _delete_group_if_empty(group):
+    if group is None:
+        return
+    if not group.transactions.exists():
+        group.delete()
+
+
 class TransactionViewSet(viewsets.ModelViewSet):
     queryset = Transaction.objects.all()
     serializer_class = TransactionSerializer
@@ -152,10 +183,61 @@ class TransactionViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return Transaction.objects.filter(user=self.request.user)
 
+    def _normalize_create_payload(self, request):
+        """
+        Returns (transactions_data, new_group_or_None, error_Response_or_None).
+        Supports:
+        - { "group": true, "name": "...", "transactions": [...] }
+        - bare list / single object (optional group_id per item)
+        """
+        data = request.data
+        if isinstance(data, dict) and data.get("group") is True:
+            transactions_data = data.get("transactions")
+            if not isinstance(transactions_data, list) or len(transactions_data) == 0:
+                return None, None, Response(
+                    {"transactions": ["This field is required and must be a non-empty list."]},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            for item in transactions_data:
+                if isinstance(item, dict) and item.get("group_id") is not None:
+                    return None, None, Response(
+                        {"group_id": ["Cannot bind to an existing group when creating a new group."]},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+            dates = []
+            for item in transactions_data:
+                if not isinstance(item, dict):
+                    continue
+                dt = _coerce_to_datetime(item.get("date"))
+                if dt is not None:
+                    dates.append(dt)
+            if not dates:
+                return None, None, Response(
+                    {"date": ["A valid date is required on transactions when creating a group."]},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            name = (data.get("name") or "").strip()
+            if not name:
+                first = transactions_data[0] if isinstance(transactions_data[0], dict) else {}
+                name = (first.get("description") or "").strip() or "Transaction group"
+
+            group = TransactionGroup.objects.create(
+                user=request.user,
+                name=name,
+                date=min(dates),
+            )
+            return transactions_data, group, None
+
+        if not isinstance(data, list):
+            return [data], None, None
+        return data, None, None
+
     def create(self, request):
-        transactions_data = request.data
-        if not isinstance(transactions_data, list):
-            transactions_data = [transactions_data]
+        transactions_data, new_group, err = self._normalize_create_payload(request)
+        if err is not None:
+            return err
 
         created_transactions = []
         for transaction_data in transactions_data:
@@ -164,6 +246,9 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 if isinstance(transaction_data, dict)
                 else dict(transaction_data)
             )
+
+            if new_group is not None:
+                tx_data.pop("group_id", None)
 
             account = Account.objects.get(pk=tx_data.get("account"))
 
@@ -193,6 +278,8 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 request, tx_data, parsed_amount, account, conversion
             )
             if isinstance(split_result, Response):
+                if new_group is not None:
+                    new_group.delete()
                 return split_result
 
             batch = split_result if split_result is not None else [tx_data]
@@ -200,22 +287,84 @@ class TransactionViewSet(viewsets.ModelViewSet):
             for item in batch:
                 err = apply_receivable_link(request, item, item["amount"])
                 if err is not None:
+                    if new_group is not None:
+                        new_group.delete()
                     return err
 
                 transaction_serializer = self.get_serializer(data=item)
                 if transaction_serializer.is_valid():
-                    transaction = transaction_serializer.save()
+                    if new_group is not None:
+                        transaction = transaction_serializer.save(group=new_group)
+                    else:
+                        transaction = transaction_serializer.save()
                     created_transactions.append(transaction_serializer.data)
 
                     update_reports.delay(transaction.account.id)
                     update_user_product_list_items.delay(transaction.user.id)
                 else:
+                    if new_group is not None and not created_transactions:
+                        new_group.delete()
                     return Response(
                         transaction_serializer.errors,
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
         return Response(created_transactions, status=status.HTTP_201_CREATED)
+
+    def list(self, request, *args, **kwargs):
+        # When filtering by group, return member transactions without collapsing
+        if request.query_params.get("group") not in (None, ""):
+            return super().list(request, *args, **kwargs)
+
+        queryset = self.filter_queryset(self.get_queryset())
+
+        ungrouped = list(queryset.filter(group__isnull=True))
+        group_ids = (
+            queryset.filter(group__isnull=False)
+            .values_list("group_id", flat=True)
+            .distinct()
+        )
+        groups = list(
+            TransactionGroup.objects.filter(
+                user=request.user, id__in=group_ids
+            ).prefetch_related("transactions")
+        )
+
+        feed = []
+        for tx in ungrouped:
+            feed.append(("transaction", tx.date, tx))
+        for group in groups:
+            feed.append(("group", group.date, group))
+
+        reverse = True
+        ordering = request.query_params.get("ordering", "-date")
+        if ordering == "date":
+            reverse = False
+        feed.sort(key=lambda item: item[1] or timezone.now(), reverse=reverse)
+
+        paginator = self.paginate_queryset([item[2] for item in feed])
+        if paginator is not None:
+            results = []
+            for obj in paginator:
+                if isinstance(obj, TransactionGroup):
+                    results.append(
+                        TransactionGroupListSerializer(obj, context={"request": request}).data
+                    )
+                else:
+                    results.append(
+                        self.get_serializer(obj).data
+                    )
+            return self.get_paginated_response(results)
+
+        results = []
+        for _, _, obj in feed:
+            if isinstance(obj, TransactionGroup):
+                results.append(
+                    TransactionGroupListSerializer(obj, context={"request": request}).data
+                )
+            else:
+                results.append(self.get_serializer(obj).data)
+        return Response(results)
 
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
@@ -225,6 +374,8 @@ class TransactionViewSet(viewsets.ModelViewSet):
             transaction = self.get_queryset().get(pk=pk)
         except Transaction.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
+
+        previous_group = transaction.group
 
         tx_data = (
             request.data.copy() if hasattr(request.data, "copy") else dict(request.data)
@@ -290,6 +441,8 @@ class TransactionViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(transaction, data=tx_data, partial=True)
         if serializer.is_valid():
             serializer.save()
+            if previous_group is not None and previous_group != transaction.group:
+                _delete_group_if_empty(previous_group)
             update_reports.delay(transaction.account.id)
             update_user_product_list_items.delay(transaction.user.id)
             return Response(serializer.data)
@@ -297,9 +450,13 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         transaction_pk = self.get_queryset().get(pk=kwargs["pk"])
+        group = transaction_pk.group
         update_reports.delay(transaction_pk.account.id)
         update_user_product_list_items.delay(transaction_pk.user.id)
-        return super().destroy(request, *args, **kwargs)
+        response = super().destroy(request, *args, **kwargs)
+        _delete_group_if_empty(group)
+        return response
+
 
 
 class CurrencyExchangeViewSet(viewsets.ModelViewSet):

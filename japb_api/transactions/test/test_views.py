@@ -7,7 +7,14 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from ..models import Transaction, CurrencyExchange, ExchangeComission, Category, TransactionItem
+from ..models import (
+    Transaction,
+    TransactionGroup,
+    CurrencyExchange,
+    ExchangeComission,
+    Category,
+    TransactionItem,
+)
 from ..factories import TransactionFactory, CategoryFactory, ExchangeComissionFactory, CurrencyExchangeFactory
 from japb_api.users.models import User
 from japb_api.accounts.models import Account
@@ -1106,3 +1113,241 @@ class TestCategories(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class TestTransactionGroups(APITestCase):
+    def setUp(self):
+        self.fake = Faker(["en-US"])
+        self.user = User.objects.create_user(
+            email=self.fake.email(),
+            username=self.fake.user_name(),
+            password=self.fake.password(),
+        )
+        self.other_user = User.objects.create_user(
+            email=self.fake.email(),
+            username=self.fake.user_name(),
+            password=self.fake.password(),
+        )
+        self.token = RefreshToken.for_user(self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.token.access_token}")
+
+        self.currency = Currency.objects.create(
+            name="VES", default_conversion_source="paralelo"
+        )
+        self.account = Account.objects.create(
+            name="Test Account",
+            currency=self.currency,
+            decimal_places=2,
+            user=self.user,
+        )
+        self.category = Category.objects.create(
+            name="Food", color="#000000", description="Food expenses"
+        )
+        self.main_currency = CurrencyFactory(name="USD")
+        self.current_conversion = CurrencyConversionHistorialFactory(
+            currency_from=self.currency,
+            currency_to=self.main_currency,
+            date=datetime.now(tz=timezone.utc),
+            rate=60,
+            source="paralelo",
+        )
+        self.now = datetime.now(tz=timezone.utc)
+
+    def _tx_payload(self, amount, description, date=None):
+        return {
+            "amount": amount,
+            "description": description,
+            "account": self.account.id,
+            "date": date or self.now,
+            "category": self.category.id,
+        }
+
+    def test_create_transactions_as_new_group(self):
+        payload = {
+            "group": True,
+            "name": "Supermarket trip",
+            "transactions": [
+                self._tx_payload(-50, "Milk"),
+                self._tx_payload(-30, "Bread"),
+            ],
+        }
+        response = self.client.post(
+            reverse("transactions-list"), payload, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(len(response.json()), 2)
+        self.assertEqual(Transaction.objects.count(), 2)
+        self.assertEqual(TransactionGroup.objects.count(), 1)
+
+        group = TransactionGroup.objects.get()
+        self.assertEqual(group.name, "Supermarket trip")
+        self.assertEqual(group.user, self.user)
+        for item in response.json():
+            self.assertEqual(item["group"], group.id)
+            self.assertEqual(item["type"], "transaction")
+
+        members = Transaction.objects.filter(group=group)
+        self.assertEqual(members.count(), 2)
+
+    def test_create_group_defaults_name_from_first_description(self):
+        payload = {
+            "group": True,
+            "transactions": [
+                self._tx_payload(-10, "First item"),
+                self._tx_payload(-20, "Second item"),
+            ],
+        }
+        response = self.client.post(
+            reverse("transactions-list"), payload, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(TransactionGroup.objects.get().name, "First item")
+
+    def test_create_group_empty_transactions_returns_400(self):
+        payload = {"group": True, "name": "Empty", "transactions": []}
+        response = self.client.post(
+            reverse("transactions-list"), payload, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(TransactionGroup.objects.count(), 0)
+
+    def test_bind_transaction_to_existing_group(self):
+        group = TransactionGroup.objects.create(
+            user=self.user, name="Existing", date=self.now
+        )
+        payload = self._tx_payload(-15, "Bound item")
+        payload["group_id"] = group.id
+
+        response = self.client.post(
+            reverse("transactions-list"), payload, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()[0]["group"], group.id)
+        self.assertEqual(Transaction.objects.get().group_id, group.id)
+
+    def test_bind_to_other_users_group_returns_400(self):
+        other_group = TransactionGroup.objects.create(
+            user=self.other_user, name="Other", date=self.now
+        )
+        payload = self._tx_payload(-15, "Bad bind")
+        payload["group_id"] = other_group.id
+
+        response = self.client.post(
+            reverse("transactions-list"), payload, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(Transaction.objects.count(), 0)
+
+    def test_list_collapses_grouped_transactions(self):
+        # ungrouped
+        self.client.post(
+            reverse("transactions-list"),
+            self._tx_payload(-5, "Solo", date=self.now - timedelta(hours=1)),
+            format="json",
+        )
+        # grouped
+        self.client.post(
+            reverse("transactions-list"),
+            {
+                "group": True,
+                "name": "Trip",
+                "transactions": [
+                    self._tx_payload(-50, "A", date=self.now),
+                    self._tx_payload(-30, "B", date=self.now),
+                ],
+            },
+            format="json",
+        )
+
+        response = self.client.get(reverse("transactions-list"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.json()["results"]
+        self.assertEqual(len(results), 2)
+
+        types = {r["type"] for r in results}
+        self.assertEqual(types, {"transaction", "group"})
+
+        group_row = next(r for r in results if r["type"] == "group")
+        self.assertEqual(group_row["name"], "Trip")
+        self.assertEqual(group_row["transaction_count"], 2)
+        # -50 => -83 cents, -30 => -50 cents => -1.33
+        self.assertEqual(group_row["total_main_currency_amount"], "-1.33")
+
+        solo = next(r for r in results if r["type"] == "transaction")
+        self.assertEqual(solo["description"], "Solo")
+        self.assertIsNone(solo["group"])
+
+    def test_filter_by_group_returns_members(self):
+        create_resp = self.client.post(
+            reverse("transactions-list"),
+            {
+                "group": True,
+                "name": "Trip",
+                "transactions": [
+                    self._tx_payload(-50, "A"),
+                    self._tx_payload(-30, "B"),
+                ],
+            },
+            format="json",
+        )
+        group_id = create_resp.json()[0]["group"]
+        # another ungrouped tx should not appear
+        self.client.post(
+            reverse("transactions-list"),
+            self._tx_payload(-5, "Solo"),
+            format="json",
+        )
+
+        response = self.client.get(
+            reverse("transactions-list") + f"?group={group_id}"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.json()["results"]
+        self.assertEqual(len(results), 2)
+        self.assertTrue(all(r["type"] == "transaction" for r in results))
+        self.assertTrue(all(r["group"] == group_id for r in results))
+        descriptions = {r["description"] for r in results}
+        self.assertEqual(descriptions, {"A", "B"})
+
+    def test_grouped_transactions_do_not_affect_balance(self):
+        # baseline balance via ungrouped creates of same amounts
+        self.client.post(
+            reverse("transactions-list"),
+            {
+                "group": True,
+                "name": "Trip",
+                "transactions": [
+                    self._tx_payload(-50, "A"),
+                    self._tx_payload(-30, "B"),
+                ],
+            },
+            format="json",
+        )
+        response = self.client.get(
+            reverse("accounts-detail", kwargs={"pk": self.account.id})
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # -50.00 + -30.00 = -80.00
+        self.assertEqual(response.json()["balance"], "-80.00")
+
+    def test_deleting_last_member_deletes_empty_group(self):
+        create_resp = self.client.post(
+            reverse("transactions-list"),
+            {
+                "group": True,
+                "name": "Single",
+                "transactions": [self._tx_payload(-10, "Only")],
+            },
+            format="json",
+        )
+        tx_id = create_resp.json()[0]["id"]
+        group_id = create_resp.json()[0]["group"]
+        self.assertTrue(TransactionGroup.objects.filter(pk=group_id).exists())
+
+        response = self.client.delete(
+            reverse("transactions-detail", kwargs={"pk": tx_id})
+        )
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(TransactionGroup.objects.filter(pk=group_id).exists())
+
