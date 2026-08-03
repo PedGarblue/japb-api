@@ -1,0 +1,22 @@
+---
+description: Run Django manage.py and tests via docker compose exec web
+alwaysApply: true
+---
+
+# Docker Compose commands
+
+The local stack is expected to already be running (`docker compose up`). Run Django management commands and tests inside the existing `web` container — never on the host, and never via interactive `bash`.
+
+```bash
+# ✅ GOOD
+sudo docker compose exec web ./manage.py test
+sudo docker compose exec web ./manage.py migrate
+sudo docker compose exec web ./manage.py shell -c "..."
+
+# ❌ BAD — host Python / interactive shell / one-off run
+python manage.py test
+sudo docker compose run web bash
+sudo docker compose run --rm web ./manage.py test
+```
+
+Pass the full command after `web`. Prefer `exec` over `run` unless the stack is not running.

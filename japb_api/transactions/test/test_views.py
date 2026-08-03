@@ -1204,10 +1204,102 @@ class TestTransactionGroups(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(TransactionGroup.objects.get().name, "First item")
 
+    def test_create_group_defaults_date_to_oldest_transaction(self):
+        older = self.now - timedelta(days=3)
+        newer = self.now
+        payload = {
+            "group": True,
+            "name": "Trip",
+            "transactions": [
+                self._tx_payload(-10, "Newer", date=newer),
+                self._tx_payload(-20, "Older", date=older),
+            ],
+        }
+        response = self.client.post(
+            reverse("transactions-list"), payload, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        group = TransactionGroup.objects.get()
+        self.assertEqual(group.date, older)
+
+    def test_create_group_accepts_optional_explicit_date(self):
+        older = self.now - timedelta(days=3)
+        explicit = self.now - timedelta(days=1)
+        payload = {
+            "group": True,
+            "name": "Trip",
+            "date": explicit,
+            "transactions": [
+                self._tx_payload(-10, "A", date=self.now),
+                self._tx_payload(-20, "B", date=older),
+            ],
+        }
+        response = self.client.post(
+            reverse("transactions-list"), payload, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(TransactionGroup.objects.get().date, explicit)
+
     def test_create_group_empty_transactions_returns_400(self):
         payload = {"group": True, "name": "Empty", "transactions": []}
         response = self.client.post(
             reverse("transactions-list"), payload, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(TransactionGroup.objects.count(), 0)
+
+    def test_create_group_from_existing_transaction_ids(self):
+        older = self.now - timedelta(days=2)
+        tx_a = self.client.post(
+            reverse("transactions-list"),
+            self._tx_payload(-50, "Milk", date=older),
+            format="json",
+        ).json()[0]
+        tx_b = self.client.post(
+            reverse("transactions-list"),
+            self._tx_payload(-30, "Bread", date=self.now),
+            format="json",
+        ).json()[0]
+
+        response = self.client.post(
+            reverse("transactions-list"),
+            {
+                "group": True,
+                "name": "Supermarket",
+                "transactions": [tx_a["id"], tx_b["id"]],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(len(response.json()), 2)
+        self.assertEqual(TransactionGroup.objects.count(), 1)
+        group = TransactionGroup.objects.get()
+        self.assertEqual(group.name, "Supermarket")
+        self.assertEqual(group.date, older)
+        self.assertEqual(
+            set(Transaction.objects.filter(group=group).values_list("id", flat=True)),
+            {tx_a["id"], tx_b["id"]},
+        )
+        self.assertTrue(all(item["group"] == group.id for item in response.json()))
+
+    def test_create_group_from_unknown_ids_returns_400(self):
+        response = self.client.post(
+            reverse("transactions-list"),
+            {"group": True, "name": "Bad", "transactions": [999999]},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(TransactionGroup.objects.count(), 0)
+
+    def test_create_group_mixed_ids_and_objects_returns_400(self):
+        response = self.client.post(
+            reverse("transactions-list"),
+            {
+                "group": True,
+                "name": "Mixed",
+                "transactions": [1, self._tx_payload(-10, "Nope")],
+            },
+            format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(TransactionGroup.objects.count(), 0)

@@ -168,6 +168,16 @@ def _delete_group_if_empty(group):
         group.delete()
 
 
+def _is_transaction_pk(value):
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, int):
+        return True
+    if isinstance(value, str) and value.isdigit():
+        return True
+    return False
+
+
 class TransactionViewSet(viewsets.ModelViewSet):
     queryset = Transaction.objects.all()
     serializer_class = TransactionSerializer
@@ -183,12 +193,62 @@ class TransactionViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return Transaction.objects.filter(user=self.request.user)
 
+    def _create_group_from_existing_ids(self, request, data, raw_ids):
+        """Bind existing transactions into a new display group."""
+        try:
+            ids = [int(pk) for pk in raw_ids]
+        except (TypeError, ValueError):
+            return Response(
+                {"transactions": ["Transaction ids must be integers."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        unique_ids = list(dict.fromkeys(ids))
+        transactions = list(
+            Transaction.objects.filter(user=request.user, pk__in=unique_ids)
+            .select_related("account", "receivable", "receivable__contact")
+            .order_by("date")
+        )
+        if len(transactions) != len(unique_ids):
+            return Response(
+                {"transactions": ["One or more transactions were not found."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        group_date = _coerce_to_datetime(data.get("date"))
+        if group_date is None:
+            group_date = min(tx.date for tx in transactions)
+
+        name = (data.get("name") or "").strip()
+        if not name:
+            name = (transactions[0].description or "").strip() or "Transaction group"
+
+        group = TransactionGroup.objects.create(
+            user=request.user,
+            name=name,
+            date=group_date,
+        )
+
+        previous_groups = []
+        for tx in transactions:
+            if tx.group_id and tx.group_id != group.id:
+                previous_groups.append(tx.group)
+            tx.group = group
+            tx.save(update_fields=["group", "updated_at"])
+
+        for previous in previous_groups:
+            _delete_group_if_empty(previous)
+
+        serializer = self.get_serializer(transactions, many=True)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
     def _normalize_create_payload(self, request):
         """
         Returns (transactions_data, new_group_or_None, error_Response_or_None).
         Supports:
-        - { "group": true, "name": "...", "transactions": [...] }
+        - { "group": true, "name": "...", "transactions": [ {...}, ... ] }  (create new)
         - bare list / single object (optional group_id per item)
+        Existing-id grouping is handled separately in create().
         """
         data = request.data
         if isinstance(data, dict) and data.get("group") is True:
@@ -198,35 +258,50 @@ class TransactionViewSet(viewsets.ModelViewSet):
                     {"transactions": ["This field is required and must be a non-empty list."]},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+            if not all(isinstance(item, dict) for item in transactions_data):
+                return None, None, Response(
+                    {
+                        "transactions": [
+                            "Expected a list of transaction objects, or a list of existing transaction ids."
+                        ]
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             for item in transactions_data:
-                if isinstance(item, dict) and item.get("group_id") is not None:
+                if item.get("group_id") is not None:
                     return None, None, Response(
                         {"group_id": ["Cannot bind to an existing group when creating a new group."]},
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
-            dates = []
-            for item in transactions_data:
-                if not isinstance(item, dict):
-                    continue
-                dt = _coerce_to_datetime(item.get("date"))
-                if dt is not None:
-                    dates.append(dt)
-            if not dates:
-                return None, None, Response(
-                    {"date": ["A valid date is required on transactions when creating a group."]},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+            # Group date is optional on the payload. Default: oldest member transaction date.
+            group_date = _coerce_to_datetime(data.get("date"))
+            if group_date is None:
+                dates = []
+                for item in transactions_data:
+                    dt = _coerce_to_datetime(item.get("date"))
+                    if dt is not None:
+                        dates.append(dt)
+                if not dates:
+                    return None, None, Response(
+                        {
+                            "transactions": [
+                                "Each transaction needs a valid date so the group date can default to the oldest."
+                            ]
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                group_date = min(dates)
 
             name = (data.get("name") or "").strip()
             if not name:
-                first = transactions_data[0] if isinstance(transactions_data[0], dict) else {}
+                first = transactions_data[0]
                 name = (first.get("description") or "").strip() or "Transaction group"
 
             group = TransactionGroup.objects.create(
                 user=request.user,
                 name=name,
-                date=min(dates),
+                date=group_date,
             )
             return transactions_data, group, None
 
@@ -235,17 +310,33 @@ class TransactionViewSet(viewsets.ModelViewSet):
         return data, None, None
 
     def create(self, request):
+        data = request.data
+        # Group existing transactions by id:
+        # { "group": true, "name": "...", "transactions": [1, 2, 3] }
+        if isinstance(data, dict) and data.get("group") is True:
+            items = data.get("transactions")
+            if isinstance(items, list) and items and all(_is_transaction_pk(i) for i in items):
+                return self._create_group_from_existing_ids(request, data, items)
+
         transactions_data, new_group, err = self._normalize_create_payload(request)
         if err is not None:
             return err
 
         created_transactions = []
         for transaction_data in transactions_data:
-            tx_data = (
-                transaction_data.copy()
-                if isinstance(transaction_data, dict)
-                else dict(transaction_data)
-            )
+            if not isinstance(transaction_data, dict):
+                if new_group is not None:
+                    new_group.delete()
+                return Response(
+                    {
+                        "transactions": [
+                            "Expected a list of transaction objects, or a list of existing transaction ids."
+                        ]
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            tx_data = transaction_data.copy()
 
             if new_group is not None:
                 tx_data.pop("group_id", None)
