@@ -25,6 +25,10 @@ class Receivable(models.Model):
         Contact, related_name="receivables", on_delete=models.PROTECT
     )
     due_date = models.DateField()
+    # Optional principal not backed by linked transactions (e.g. expense shares).
+    explicit_principal_usd = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

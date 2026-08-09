@@ -56,10 +56,15 @@ class ReceivableSerializer(serializers.ModelSerializer):
             "contact_id",
             "contact_name",
             "due_date",
+            "explicit_principal_usd",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["contact_id", "contact_name"]
+        read_only_fields = [
+            "contact_id",
+            "contact_name",
+            "explicit_principal_usd",
+        ]
 
     def create(self, validated_data):
         contact_name = validated_data.pop("contact")

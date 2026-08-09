@@ -19,6 +19,9 @@ def compute_receivable_totals(receivable, usd_currency=None):
     )
 
     principal_usd = 0.0
+    if receivable.explicit_principal_usd is not None:
+        principal_usd = float(receivable.explicit_principal_usd)
+
     paid_usd = 0.0
     for tx in txs:
         usd, err = convert_transaction_to_usd(tx, usd_currency)

@@ -31,6 +31,7 @@ class Common(Configuration):
         'japb_api.accounts',
         'japb_api.transactions',
         'japb_api.receivables',
+        'japb_api.expense_shares',
         'japb_api.reports',
         'japb_api.products',
     )

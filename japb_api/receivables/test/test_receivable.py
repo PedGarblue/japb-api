@@ -285,3 +285,77 @@ class TestReceivableViews(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(Receivable.objects.count(), 0)
+
+    def test_explicit_principal_usd_without_transactions(self):
+        contact = Contact.objects.create(user=self.user, name="Partner")
+        rec = Receivable.objects.create(
+            user=self.user,
+            contact=contact,
+            description="Shared expenses 2022-01",
+            due_date=date(2022, 2, 28),
+            explicit_principal_usd="75.50",
+        )
+        response = self.client.get(
+            reverse("receivables-detail", kwargs={"pk": rec.id}), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(body["explicit_principal_usd"], "75.50")
+        self.assertEqual(body["principal_usd"], 75.50)
+        self.assertEqual(body["paid_usd"], 0.0)
+        self.assertEqual(body["outstanding_usd"], 75.50)
+        self.assertEqual(body["status"], "UNPAID")
+        self.assertEqual(body["transactions"], [])
+
+    def test_explicit_principal_plus_collection_and_loan_tx(self):
+        contact = Contact.objects.create(user=self.user, name="Partner")
+        rec = Receivable.objects.create(
+            user=self.user,
+            contact=contact,
+            description="Mixed principal",
+            due_date=date(2022, 2, 28),
+            explicit_principal_usd="50.00",
+        )
+        Transaction.objects.create(
+            user=self.user,
+            account=self.account,
+            receivable=rec,
+            amount=-2500,
+            description="Extra principal tx",
+            date=datetime(2022, 1, 10, tzinfo=timezone.utc),
+        )
+        Transaction.objects.create(
+            user=self.user,
+            account=self.account,
+            receivable=rec,
+            amount=4000,
+            description="Partial repay",
+            date=datetime(2022, 2, 1, tzinfo=timezone.utc),
+        )
+        response = self.client.get(
+            reverse("receivables-detail", kwargs={"pk": rec.id}), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(body["principal_usd"], 75.0)
+        self.assertEqual(body["paid_usd"], 40.0)
+        self.assertEqual(body["outstanding_usd"], 35.0)
+        self.assertEqual(body["status"], "UNPAID")
+
+    def test_explicit_principal_usd_is_read_only_on_api(self):
+        contact = Contact.objects.create(user=self.user, name="Partner")
+        rec = Receivable.objects.create(
+            user=self.user,
+            contact=contact,
+            description="Shared",
+            due_date=date(2022, 2, 28),
+            explicit_principal_usd="10.00",
+        )
+        response = self.client.patch(
+            reverse("receivables-detail", kwargs={"pk": rec.id}),
+            {"explicit_principal_usd": "99.00"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        rec.refresh_from_db()
+        self.assertEqual(str(rec.explicit_principal_usd), "10.00")
