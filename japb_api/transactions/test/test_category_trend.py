@@ -169,16 +169,18 @@ class TestCategoryTrendViewSet(APITestCase):
 
         data = response.json()
         children = data["periods"][0]["children"]
-        self.assertEqual(len(children), 2)
+        self.assertEqual(len(children), 3)
         names = {c["category_name"] for c in children}
-        self.assertEqual(names, {"Groceries", "Restaurants"})
+        self.assertEqual(names, {"Food", "Groceries", "Restaurants"})
+        food = next(c for c in children if c["category_name"] == "Food")
         groceries = next(c for c in children if c["category_name"] == "Groceries")
         restaurants = next(c for c in children if c["category_name"] == "Restaurants")
+        self.assertEqual(food["total_amount_usd"], 50.0)
         self.assertEqual(groceries["total_amount_usd"], 30.0)
         self.assertEqual(restaurants["total_amount_usd"], 20.0)
 
-    def test_parent_transactions_not_in_children_breakdown(self):
-        """Transactions tagged directly on the parent appear in total but not children."""
+    def test_parent_transactions_in_children_breakdown(self):
+        """Transactions tagged directly on the parent appear in the subcategory breakdown."""
         self._make_tx(-50, self.parent_category, "2025-01-15")
 
         response = self.client.get(self.url, {
@@ -189,7 +191,11 @@ class TestCategoryTrendViewSet(APITestCase):
 
         data = response.json()
         self.assertEqual(data["periods"][0]["total_amount_usd"], 50.0)
-        self.assertEqual(data["periods"][0]["children"], [])
+        children = data["periods"][0]["children"]
+        self.assertEqual(len(children), 1)
+        self.assertEqual(children[0]["category_id"], self.parent_category.id)
+        self.assertEqual(children[0]["category_name"], "Food")
+        self.assertEqual(children[0]["total_amount_usd"], 50.0)
 
     # --- Empty periods ---
 
@@ -417,6 +423,7 @@ class TestCategoryTrendViewSet(APITestCase):
         # Parent (50) + Groceries (30) = 80, Restaurants excluded
         self.assertEqual(data["periods"][0]["total_amount_usd"], 80.0)
         children_names = [c["category_name"] for c in data["periods"][0]["children"]]
+        self.assertIn("Food", children_names)
         self.assertIn("Groceries", children_names)
         self.assertNotIn("Restaurants", children_names)
 
@@ -434,7 +441,10 @@ class TestCategoryTrendViewSet(APITestCase):
 
         data = response.json()
         self.assertEqual(data["periods"][0]["total_amount_usd"], 50.0)
-        self.assertEqual(data["periods"][0]["children"], [])
+        children = data["periods"][0]["children"]
+        self.assertEqual(len(children), 1)
+        self.assertEqual(children[0]["category_name"], "Food")
+        self.assertEqual(children[0]["total_amount_usd"], 50.0)
 
     # --- include_categories ---
 
@@ -452,9 +462,10 @@ class TestCategoryTrendViewSet(APITestCase):
         data = response.json()
         self.assertEqual(data["periods"][0]["total_amount_usd"], 75.0)
         children = data["periods"][0]["children"]
-        self.assertEqual(len(children), 1)
-        self.assertEqual(children[0]["category_name"], "Transportation")
-        self.assertEqual(children[0]["total_amount_usd"], 25.0)
+        names = {c["category_name"] for c in children}
+        self.assertEqual(names, {"Food", "Transportation"})
+        transportation = next(c for c in children if c["category_name"] == "Transportation")
+        self.assertEqual(transportation["total_amount_usd"], 25.0)
 
     def test_include_nonexistent_category_returns_404(self):
         response = self.client.get(self.url, {
@@ -485,7 +496,7 @@ class TestCategoryTrendViewSet(APITestCase):
         # Parent(50) + Groceries(30) + Transportation(10) = 90
         self.assertEqual(data["periods"][0]["total_amount_usd"], 90.0)
         children_names = {c["category_name"] for c in data["periods"][0]["children"]}
-        self.assertEqual(children_names, {"Groceries", "Transportation"})
+        self.assertEqual(children_names, {"Food", "Groceries", "Transportation"})
 
     # --- Period boundaries ---
 

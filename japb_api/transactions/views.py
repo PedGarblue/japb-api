@@ -1146,14 +1146,13 @@ class CategoryTrendViewSet(viewsets.ViewSet):
             periods[idx]["total_amount_usd"] += abs(usd_amount)
 
             cat_id = transaction.category_id
-            if cat_id != category.id:
-                if cat_id not in periods[idx]["children"]:
-                    periods[idx]["children"][cat_id] = {
-                        "category_id": cat_id,
-                        "category_name": transaction.category.name,
-                        "total_amount_usd": 0.0,
-                    }
-                periods[idx]["children"][cat_id]["total_amount_usd"] += abs(usd_amount)
+            if cat_id not in periods[idx]["children"]:
+                periods[idx]["children"][cat_id] = {
+                    "category_id": cat_id,
+                    "category_name": transaction.category.name,
+                    "total_amount_usd": 0.0,
+                }
+            periods[idx]["children"][cat_id]["total_amount_usd"] += abs(usd_amount)
 
         grand_total = 0.0
         for period in periods:
