@@ -28,6 +28,8 @@ class TransactionGroupListSerializer(serializers.Serializer):
     date = serializers.DateTimeField()
     transaction_count = serializers.SerializerMethodField()
     total_main_currency_amount = serializers.SerializerMethodField()
+    total_amount = serializers.SerializerMethodField()
+    currency = serializers.SerializerMethodField()
 
     def get_type(self, obj):
         return "group"
@@ -37,14 +39,48 @@ class TransactionGroupListSerializer(serializers.Serializer):
             return obj.annotated_transaction_count
         return obj.transactions.count()
 
+    def _members(self, obj):
+        return list(obj.transactions.all())
+
+    def _single_non_usd_currency(self, members):
+        """Return (currency_name, decimal_places) when all members share one non-USD currency."""
+        if not members:
+            return None
+        currency_ids = {m.account.currency_id for m in members}
+        if len(currency_ids) != 1:
+            return None
+        currency = members[0].account.currency
+        if currency.name == "USD":
+            return None
+        decimal_places = max(m.account.decimal_places for m in members)
+        return currency.name, decimal_places
+
     def get_total_main_currency_amount(self, obj):
-        members = list(obj.transactions.all())
+        members = self._members(obj)
         if not members:
             return None
         if any(m.to_main_currency_amount is None for m in members):
             return None
         total = sum(m.to_main_currency_amount for m in members)
         return f"{total / 100:.2f}"
+
+    def get_total_amount(self, obj):
+        members = self._members(obj)
+        info = self._single_non_usd_currency(members)
+        if info is None:
+            return None
+        _, decimal_places = info
+        total = sum(
+            m.amount / (10 ** m.account.decimal_places) for m in members
+        )
+        return f"{total:.{decimal_places}f}"
+
+    def get_currency(self, obj):
+        members = self._members(obj)
+        info = self._single_non_usd_currency(members)
+        if info is None:
+            return None
+        return info[0]
 
 
 class TransactionSerializer(serializers.ModelSerializer):

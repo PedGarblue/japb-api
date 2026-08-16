@@ -1,7 +1,7 @@
 import calendar
 from datetime import timedelta, datetime, date, time
 from dateutil.relativedelta import relativedelta
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime, parse_date
 from django_filters.rest_framework import DjangoFilterBackend
@@ -9,6 +9,7 @@ from rest_framework import status, viewsets, filters
 from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+
 
 from .tasks import update_reports
 from ..accounts.models import Account
@@ -418,7 +419,14 @@ class TransactionViewSet(viewsets.ModelViewSet):
         groups = list(
             TransactionGroup.objects.filter(
                 user=request.user, id__in=group_ids
-            ).prefetch_related("transactions")
+            ).prefetch_related(
+                Prefetch(
+                    "transactions",
+                    queryset=Transaction.objects.select_related(
+                        "account", "account__currency"
+                    ),
+                )
+            )
         )
 
         feed = []

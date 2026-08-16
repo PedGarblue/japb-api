@@ -1365,10 +1365,93 @@ class TestTransactionGroups(APITestCase):
         self.assertEqual(group_row["transaction_count"], 2)
         # -50 => -83 cents, -30 => -50 cents => -1.33
         self.assertEqual(group_row["total_main_currency_amount"], "-1.33")
+        # single non-USD currency: also expose original-currency total
+        self.assertEqual(group_row["total_amount"], "-80.00")
+        self.assertEqual(group_row["currency"], "VES")
 
         solo = next(r for r in results if r["type"] == "transaction")
         self.assertEqual(solo["description"], "Solo")
         self.assertIsNone(solo["group"])
+
+    def test_list_group_omits_total_amount_for_usd_only_group(self):
+        usd_account = Account.objects.create(
+            name="USD Account",
+            currency=self.main_currency,
+            decimal_places=2,
+            user=self.user,
+        )
+        self.client.post(
+            reverse("transactions-list"),
+            {
+                "group": True,
+                "name": "USD Trip",
+                "transactions": [
+                    {
+                        "amount": -10,
+                        "description": "A",
+                        "account": usd_account.id,
+                        "date": self.now,
+                        "category": self.category.id,
+                    },
+                    {
+                        "amount": -20,
+                        "description": "B",
+                        "account": usd_account.id,
+                        "date": self.now,
+                        "category": self.category.id,
+                    },
+                ],
+            },
+            format="json",
+        )
+
+        response = self.client.get(reverse("transactions-list"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        group_row = next(r for r in response.json()["results"] if r["type"] == "group")
+        self.assertEqual(group_row["name"], "USD Trip")
+        self.assertIsNone(group_row["total_amount"])
+        self.assertIsNone(group_row["currency"])
+
+    def test_list_group_omits_total_amount_for_mixed_currency_group(self):
+        usd_account = Account.objects.create(
+            name="USD Account",
+            currency=self.main_currency,
+            decimal_places=2,
+            user=self.user,
+        )
+        tx_ves = self.client.post(
+            reverse("transactions-list"),
+            self._tx_payload(-50, "VES item"),
+            format="json",
+        ).json()[0]
+        tx_usd = self.client.post(
+            reverse("transactions-list"),
+            {
+                "amount": -10,
+                "description": "USD item",
+                "account": usd_account.id,
+                "date": self.now,
+                "category": self.category.id,
+            },
+            format="json",
+        ).json()[0]
+
+        self.client.post(
+            reverse("transactions-list"),
+            {
+                "group": True,
+                "name": "Mixed",
+                "transactions": [tx_ves["id"], tx_usd["id"]],
+            },
+            format="json",
+        )
+
+        response = self.client.get(reverse("transactions-list"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        group_row = next(r for r in response.json()["results"] if r["type"] == "group")
+        self.assertEqual(group_row["name"], "Mixed")
+        self.assertIsNone(group_row["total_amount"])
+        self.assertIsNone(group_row["currency"])
 
     def test_filter_by_group_returns_members(self):
         create_resp = self.client.post(
