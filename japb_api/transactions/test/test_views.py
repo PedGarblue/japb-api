@@ -824,6 +824,44 @@ class TestCurrencyTransaction(APITestCase):
         self.assertEqual(response_from.amount, -120000)
         self.assertEqual(response_to.amount, 120000)
 
+    def test_api_create_transactions_and_profit_when_same_currency_exchange(self):
+        # when to_amount is greater than from_amount, the endpoint should
+        # create a profit transaction on the destination account
+        from_account = self.account
+        to_account = Account.objects.create(name="Mercantil", currency=self.currency)
+        category_profit = Category.objects.create(
+            name="Profits", color="#000000", description="Profits"
+        )
+        data_payload = {
+            "from_amount": "1200",
+            "to_amount": "1250",
+            "from_account": from_account.id,
+            "to_account": to_account.id,
+            "date": datetime.now(tz=timezone.utc),
+        }
+        response = self.client.post(
+            reverse("exchanges-list"), data_payload, format="json"
+        )
+        transaction_response = response.json()
+        response_from = CurrencyExchange.objects.get(pk=transaction_response[0]["id"])
+        response_to = CurrencyExchange.objects.get(pk=transaction_response[1]["id"])
+        response_profit = ExchangeComission.objects.get(
+            pk=transaction_response[2]["id"]
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response_from.type, "from_same_currency")
+        self.assertEqual(response_to.type, "to_same_currency")
+        self.assertEqual(response_profit.type, "profit")
+        self.assertEqual(response_profit.amount, 5000)
+        self.assertEqual(response_profit.account, to_account)
+        self.assertEqual(response_profit.category, category_profit)
+        self.assertEqual(response_profit.user, self.user)
+        self.assertEqual(response_profit.exchange_from, response_from)
+        self.assertEqual(response_profit.exchange_to, response_to)
+        self.assertEqual(response_from.amount, -120000)
+        self.assertEqual(response_to.amount, 120000)
+
     def test_api_create_exchange_with_categories_if_available(self):
         # delete the initial transaction
         Transaction.objects.get().delete()

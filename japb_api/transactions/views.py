@@ -689,7 +689,7 @@ class CurrencyExchangeViewSet(viewsets.ModelViewSet):
 
         if account_from.currency == account_to.currency and comission_amount != 0:
             comission_transaction_data = {
-                "amount": -comission_amount if comission_amount > 0 else comission_amount,
+                "amount": -comission_amount,
                 "account": request.data["from_account"]
                 if comission_amount > 0
                 else request.data["to_account"],
