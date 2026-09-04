@@ -190,6 +190,37 @@ class TestAccountsViews(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json()["results"][0]["balance"], "0.10")
 
+    def test_api_accounts_list_ordered_by_transaction_count(self):
+        least_used = Account.objects.get()
+        most_used = Account.objects.create(
+            name="Most Used Account", currency=self.currency, user=self.user
+        )
+        unused = Account.objects.create(
+            name="Unused Account", currency=self.currency, user=self.user
+        )
+
+        for _ in range(3):
+            TransactionFactory(
+                amount=100,
+                description="frequent",
+                account=most_used,
+                user=self.user,
+                date=self.fake.date_time(tzinfo=pytz.UTC),
+            )
+        TransactionFactory(
+            amount=100,
+            description="once",
+            account=least_used,
+            user=self.user,
+            date=self.fake.date_time(tzinfo=pytz.UTC),
+        )
+
+        response = self.client.get(reverse("accounts-list"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = [account["name"] for account in response.json()["results"]]
+        self.assertEqual(names, [most_used.name, least_used.name, unused.name])
+
     def test_api_account_detail_shows_balance(self):
         account = Account.objects.get()
         TransactionFactory(
